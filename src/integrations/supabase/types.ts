@@ -14,16 +14,235 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      channels: {
+        Row: {
+          chatbot_id: string
+          config: Json | null
+          created_at: string
+          id: string
+          is_connected: boolean
+          platform: string
+        }
+        Insert: {
+          chatbot_id: string
+          config?: Json | null
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          platform: string
+        }
+        Update: {
+          chatbot_id?: string
+          config?: Json | null
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channels_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbots: {
+        Row: {
+          created_at: string
+          fallback_message: string
+          id: string
+          is_active: boolean
+          language: string
+          name: string
+          tone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fallback_message?: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          name: string
+          tone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fallback_message?: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          name?: string
+          tone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      handover_settings: {
+        Row: {
+          chatbot_id: string
+          created_at: string
+          enabled: boolean
+          failed_responses_threshold: number
+          handover_message: string
+          id: string
+          low_confidence_threshold: number
+          trigger_keywords: string[]
+          trigger_on_low_confidence: boolean
+          updated_at: string
+        }
+        Insert: {
+          chatbot_id: string
+          created_at?: string
+          enabled?: boolean
+          failed_responses_threshold?: number
+          handover_message?: string
+          id?: string
+          low_confidence_threshold?: number
+          trigger_keywords?: string[]
+          trigger_on_low_confidence?: boolean
+          updated_at?: string
+        }
+        Update: {
+          chatbot_id?: string
+          created_at?: string
+          enabled?: boolean
+          failed_responses_threshold?: number
+          handover_message?: string
+          id?: string
+          low_confidence_threshold?: number
+          trigger_keywords?: string[]
+          trigger_on_low_confidence?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handover_settings_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: true
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_items: {
+        Row: {
+          answer: string | null
+          chatbot_id: string
+          content: string | null
+          created_at: string
+          file_name: string | null
+          file_url: string | null
+          id: string
+          question: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          answer?: string | null
+          chatbot_id: string
+          content?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          question?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          answer?: string | null
+          chatbot_id?: string
+          content?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          question?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_items_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_chatbot_owner: { Args: { chatbot_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +369,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "admin"],
+    },
   },
 } as const
