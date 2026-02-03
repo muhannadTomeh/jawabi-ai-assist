@@ -17,28 +17,28 @@ import { mockChatbot, mockHandoverSettings } from '@/data/mockData';
 
 export default function SettingsPage() {
   const [botName, setBotName] = useState(mockChatbot.name);
-  const [language, setLanguage] = useState(mockChatbot.language);
+  const [language, setLanguage] = useState('العربية');
   const [tone, setTone] = useState(mockChatbot.tone);
-  const [fallbackMessage, setFallbackMessage] = useState(mockChatbot.fallbackMessage);
+  const [fallbackMessage, setFallbackMessage] = useState('عذراً، لم أستطع فهم سؤالك. سيتواصل معك أحد أعضاء الفريق قريباً.');
   
   const [handoverEnabled, setHandoverEnabled] = useState(mockHandoverSettings.enabled);
   const [lowConfidence, setLowConfidence] = useState(mockHandoverSettings.triggerOnLowConfidence);
-  const [keywords, setKeywords] = useState(mockHandoverSettings.triggerKeywords.join(', '));
-  const [handoverMessage, setHandoverMessage] = useState(mockHandoverSettings.handoverMessage);
+  const [keywords, setKeywords] = useState('بشري، موظف، مساعدة، دعم');
+  const [handoverMessage, setHandoverMessage] = useState('سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة. يرجى الانتظار لحظة.');
 
   return (
     <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+          <h1 className="text-2xl font-semibold text-foreground">الإعدادات</h1>
           <p className="mt-1 text-muted-foreground">
-            Configure your chatbot behavior and responses
+            تخصيص سلوك الشات بوت وردوده
           </p>
         </div>
         <Button>
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
+          <Save className="ml-2 h-4 w-4" />
+          حفظ التغييرات
         </Button>
       </div>
 
@@ -47,11 +47,11 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general" className="gap-2">
             <Bot className="h-4 w-4" />
-            General
+            عام
           </TabsTrigger>
           <TabsTrigger value="handover" className="gap-2">
             <MessageSquare className="h-4 w-4" />
-            Human Handover
+            التحويل للدعم
           </TabsTrigger>
         </TabsList>
 
@@ -60,62 +60,60 @@ export default function SettingsPage() {
           <div className="card-elevated p-6">
             <h3 className="mb-6 flex items-center gap-2 font-semibold text-foreground">
               <Bot className="h-5 w-5 text-primary" />
-              Bot Configuration
+              إعدادات البوت
             </h3>
             
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Bot Name</Label>
+                <Label htmlFor="name">اسم البوت</Label>
                 <Input
                   id="name"
                   value={botName}
                   onChange={(e) => setBotName(e.target.value)}
-                  placeholder="e.g., Support Assistant"
+                  placeholder="مثال: مساعد الدعم"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
+                <Label htmlFor="language">اللغة</Label>
                 <Select value={language} onValueChange={setLanguage}>
                   <SelectTrigger id="language">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="English">English</SelectItem>
-                    <SelectItem value="Spanish">Spanish</SelectItem>
-                    <SelectItem value="French">French</SelectItem>
-                    <SelectItem value="German">German</SelectItem>
-                    <SelectItem value="Arabic">Arabic</SelectItem>
+                    <SelectItem value="العربية">العربية</SelectItem>
+                    <SelectItem value="الإنجليزية">الإنجليزية</SelectItem>
+                    <SelectItem value="الفرنسية">الفرنسية</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tone">Conversation Tone</Label>
+                <Label htmlFor="tone">نبرة المحادثة</Label>
                 <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
                   <SelectTrigger id="tone">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="friendly">Friendly</SelectItem>
-                    <SelectItem value="casual">Casual</SelectItem>
-                    <SelectItem value="formal">Formal</SelectItem>
+                    <SelectItem value="professional">احترافي</SelectItem>
+                    <SelectItem value="friendly">ودود</SelectItem>
+                    <SelectItem value="casual">عفوي</SelectItem>
+                    <SelectItem value="formal">رسمي</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="fallback">Fallback Message</Label>
+                <Label htmlFor="fallback">رسالة عدم الفهم</Label>
                 <Textarea
                   id="fallback"
                   value={fallbackMessage}
                   onChange={(e) => setFallbackMessage(e.target.value)}
                   rows={3}
-                  placeholder="Message shown when the bot doesn't understand..."
+                  placeholder="الرسالة التي تظهر عندما لا يفهم البوت السؤال..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  This message is sent when the chatbot cannot understand the user's request.
+                  هذه الرسالة تُرسل عندما لا يستطيع الشات بوت فهم طلب المستخدم.
                 </p>
               </div>
             </div>
@@ -128,7 +126,7 @@ export default function SettingsPage() {
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-foreground">Human Handover</h3>
+                <h3 className="font-semibold text-foreground">التحويل للدعم البشري</h3>
               </div>
               <Switch
                 checked={handoverEnabled}
@@ -139,9 +137,9 @@ export default function SettingsPage() {
             <div className={handoverEnabled ? 'space-y-6' : 'pointer-events-none opacity-50 space-y-6'}>
               <div className="flex items-center justify-between rounded-lg border border-border p-4">
                 <div>
-                  <p className="font-medium text-foreground">Trigger on Low Confidence</p>
+                  <p className="font-medium text-foreground">التحويل عند انخفاض الثقة</p>
                   <p className="text-sm text-muted-foreground">
-                    Hand over when the bot is unsure about its response
+                    تحويل المحادثة عندما يكون البوت غير متأكد من الرد
                   </p>
                 </div>
                 <Switch
@@ -151,20 +149,20 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="keywords">Trigger Keywords</Label>
+                <Label htmlFor="keywords">كلمات التحويل</Label>
                 <Input
                   id="keywords"
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
-                  placeholder="human, agent, support"
+                  placeholder="بشري، موظف، دعم"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Comma-separated keywords that trigger handover when detected
+                  كلمات مفصولة بفواصل تؤدي إلى التحويل عند اكتشافها
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="handoverMsg">Handover Message</Label>
+                <Label htmlFor="handoverMsg">رسالة التحويل</Label>
                 <Textarea
                   id="handoverMsg"
                   value={handoverMessage}
@@ -172,7 +170,7 @@ export default function SettingsPage() {
                   rows={3}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Message sent to the user when being transferred to a human
+                  الرسالة المرسلة للمستخدم عند تحويله لموظف الدعم
                 </p>
               </div>
             </div>

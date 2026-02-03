@@ -15,7 +15,7 @@ const initialMessages: Message[] = [
   {
     id: '1',
     role: 'bot',
-    content: "Hello! I'm your Support Assistant. How can I help you today?",
+    content: 'مرحباً! أنا مساعد الدعم الخاص بك. كيف يمكنني مساعدتك اليوم؟',
     timestamp: new Date(),
   },
 ];
@@ -52,26 +52,26 @@ export default function TestChatPage() {
   const getBotResponse = (userInput: string): string => {
     const lower = userInput.toLowerCase();
     
-    if (lower.includes('hours') || lower.includes('open')) {
-      return 'We are open Monday to Friday, 9 AM to 6 PM EST. Is there anything else I can help you with?';
+    if (lower.includes('ساعات') || lower.includes('مواعيد') || lower.includes('دوام')) {
+      return 'نحن متاحون من الأحد إلى الخميس، من الساعة ٩ صباحاً حتى ٦ مساءً. هل هناك شيء آخر يمكنني مساعدتك به؟';
     }
-    if (lower.includes('refund') || lower.includes('return')) {
-      return 'We offer a 30-day money-back guarantee on all products. Would you like me to help you initiate a return?';
+    if (lower.includes('استرجاع') || lower.includes('إرجاع') || lower.includes('استرداد')) {
+      return 'نقدم ضمان استرداد الأموال خلال ٣٠ يوماً على جميع المنتجات. هل تريد أن أساعدك في إجراء طلب إرجاع؟';
     }
-    if (lower.includes('human') || lower.includes('agent')) {
-      return "I'm connecting you with a team member who can better assist you. Please wait a moment.";
+    if (lower.includes('بشري') || lower.includes('موظف') || lower.includes('إنسان')) {
+      return 'سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة. يرجى الانتظار لحظة.';
     }
     
-    return "I understand you're asking about that. Based on our knowledge base, I'd be happy to help. Could you provide more details about your question?";
+    return 'أفهم استفسارك. بناءً على قاعدة المعرفة لدينا، يسعدني مساعدتك. هل يمكنك تقديم المزيد من التفاصيل حول سؤالك؟';
   };
 
   return (
     <div className="animate-fade-in flex h-[calc(100vh-8rem)] flex-col">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Test Chat</h1>
+        <h1 className="text-2xl font-semibold text-foreground">تجربة الشات</h1>
         <p className="mt-1 text-muted-foreground">
-          Test your chatbot's responses in a sandbox environment
+          اختبر ردود الشات بوت في بيئة تجريبية
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export default function TestChatPage() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a message..."
+              placeholder="اكتب رسالة..."
               className="flex-1"
             />
             <Button type="submit" size="icon">

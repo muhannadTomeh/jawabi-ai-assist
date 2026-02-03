@@ -10,19 +10,20 @@ import {
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockUser } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Bot },
-  { name: 'Knowledge Base', href: '/dashboard/knowledge', icon: BookOpen },
-  { name: 'Channels', href: '/dashboard/channels', icon: Share2 },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { name: 'Test Chat', href: '/dashboard/test', icon: MessageSquare },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'لوحة التحكم', href: '/dashboard', icon: Bot },
+  { name: 'قاعدة المعرفة', href: '/dashboard/knowledge', icon: BookOpen },
+  { name: 'القنوات', href: '/dashboard/channels', icon: Share2 },
+  { name: 'الإحصائيات', href: '/dashboard/analytics', icon: BarChart3 },
+  { name: 'تجربة الشات', href: '/dashboard/test', icon: MessageSquare },
+  { name: 'الإعدادات', href: '/dashboard/settings', icon: Settings },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -31,14 +32,18 @@ export function AppSidebar() {
     return location.pathname.startsWith(path);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar">
+    <aside className="fixed right-0 top-0 z-40 h-screen w-64 border-l border-sidebar-border bg-sidebar">
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center border-b border-sidebar-border px-6">
           <Link to="/dashboard" className="flex items-center gap-2">
             <span className="text-xl font-semibold tracking-tight text-foreground">
-              Jawabi
+              جوابي
             </span>
           </Link>
         </div>
@@ -71,15 +76,16 @@ export function AppSidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-medium text-foreground">
-                {mockUser.name}
+                {user?.user_metadata?.full_name || 'مستخدم'}
               </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {mockUser.email}
+              <p className="truncate text-xs text-muted-foreground" dir="ltr">
+                {user?.email}
               </p>
             </div>
             <button
+              onClick={handleSignOut}
               className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="Sign out"
+              title="تسجيل الخروج"
             >
               <LogOut className="h-4 w-4" />
             </button>

@@ -15,10 +15,10 @@ const typeIcons = {
   file: File,
 };
 
-const typeLabels = {
-  text: 'Text Content',
-  faq: 'FAQ',
-  file: 'File',
+const typeLabels: Record<string, string> = {
+  text: 'محتوى نصي',
+  faq: 'سؤال وجواب',
+  file: 'ملف',
 };
 
 export default function KnowledgeBasePage() {
@@ -27,23 +27,23 @@ export default function KnowledgeBasePage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Knowledge Base</h1>
+          <h1 className="text-2xl font-semibold text-foreground">قاعدة المعرفة</h1>
           <p className="mt-1 text-muted-foreground">
-            Add content for your chatbot to learn from
+            أضف محتوى ليتعلم منه الشات بوت
           </p>
         </div>
         <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Content
+          <Plus className="ml-2 h-4 w-4" />
+          إضافة محتوى
         </Button>
       </div>
 
       {/* Search */}
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search knowledge base..."
-          className="pl-10"
+          placeholder="البحث في قاعدة المعرفة..."
+          className="pr-10"
         />
       </div>
 
@@ -64,10 +64,10 @@ export default function KnowledgeBasePage() {
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   {typeLabels[item.type]}
                   {item.type === 'faq' && item.question && (
-                    <span className="ml-1">• {item.question}</span>
+                    <span className="mr-1">• {item.question}</span>
                   )}
                   {item.type === 'file' && item.fileName && (
-                    <span className="ml-1">• {item.fileName}</span>
+                    <span className="mr-1">• {item.fileName}</span>
                   )}
                 </p>
               </div>
@@ -77,14 +77,14 @@ export default function KnowledgeBasePage() {
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="start">
                   <DropdownMenuItem>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit
+                    <Edit className="ml-2 h-4 w-4" />
+                    تعديل
                   </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    <Trash2 className="ml-2 h-4 w-4" />
+                    حذف
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -93,17 +93,17 @@ export default function KnowledgeBasePage() {
         })}
       </div>
 
-      {/* Empty State (hidden when items exist) */}
+      {/* Empty State */}
       {mockKnowledgeItems.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-12">
           <FileText className="h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 font-semibold text-foreground">No content yet</h3>
+          <h3 className="mt-4 font-semibold text-foreground">لا يوجد محتوى</h3>
           <p className="mt-1 text-center text-sm text-muted-foreground">
-            Add FAQs, text content, or upload files to train your chatbot
+            أضف أسئلة شائعة أو محتوى نصي أو ملفات لتدريب الشات بوت
           </p>
           <Button className="mt-4">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Content
+            <Plus className="ml-2 h-4 w-4" />
+            إضافة محتوى
           </Button>
         </div>
       )}

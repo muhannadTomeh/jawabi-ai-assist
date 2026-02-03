@@ -9,6 +9,13 @@ interface ChatbotCardProps {
 }
 
 export function ChatbotCard({ chatbot }: ChatbotCardProps) {
+  const toneLabels: Record<string, string> = {
+    professional: 'احترافي',
+    friendly: 'ودود',
+    casual: 'عفوي',
+    formal: 'رسمي',
+  };
+
   return (
     <div className="card-elevated p-6">
       <div className="flex items-start justify-between">
@@ -19,7 +26,7 @@ export function ChatbotCard({ chatbot }: ChatbotCardProps) {
           <div>
             <h3 className="text-lg font-semibold text-foreground">{chatbot.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {chatbot.language} • {chatbot.tone.charAt(0).toUpperCase() + chatbot.tone.slice(1)} tone
+              {chatbot.language} • نبرة {toneLabels[chatbot.tone] || chatbot.tone}
             </p>
           </div>
         </div>
@@ -29,14 +36,14 @@ export function ChatbotCard({ chatbot }: ChatbotCardProps) {
       <div className="mt-6 flex items-center gap-3">
         <Button variant="outline" size="sm" asChild>
           <Link to="/dashboard/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            Configure
+            <Settings className="ml-2 h-4 w-4" />
+            إعدادات
           </Link>
         </Button>
         <Button size="sm" asChild>
           <Link to="/dashboard/test">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Test Chat
+            <MessageSquare className="ml-2 h-4 w-4" />
+            تجربة الشات
           </Link>
         </Button>
       </div>

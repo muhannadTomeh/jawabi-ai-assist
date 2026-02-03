@@ -7,11 +7,11 @@ interface StatusBadgeProps {
 }
 
 const statusConfig = {
-  active: { label: 'Active', color: 'bg-success' },
-  inactive: { label: 'Inactive', color: 'bg-muted-foreground' },
-  connected: { label: 'Connected', color: 'bg-success' },
-  disconnected: { label: 'Disconnected', color: 'bg-muted-foreground' },
-  pending: { label: 'Pending', color: 'bg-warning' },
+  active: { label: 'نشط', color: 'bg-success' },
+  inactive: { label: 'غير نشط', color: 'bg-muted-foreground' },
+  connected: { label: 'متصل', color: 'bg-success' },
+  disconnected: { label: 'غير متصل', color: 'bg-muted-foreground' },
+  pending: { label: 'قيد الانتظار', color: 'bg-warning' },
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
