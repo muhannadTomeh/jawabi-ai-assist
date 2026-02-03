@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MessageSquare, Users, TrendingUp, ArrowUpRight, Share2 } from 'lucide-react';
+import { MessageSquare, Users, TrendingUp, ArrowLeft, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ChatbotCard } from '@/components/dashboard/ChatbotCard';
@@ -11,44 +11,44 @@ export default function DashboardPage() {
     <div className="animate-fade-in space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-foreground">لوحة التحكم</h1>
         <p className="mt-1 text-muted-foreground">
-          Manage your chatbot and monitor performance
+          إدارة الشات بوت ومتابعة الأداء
         </p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Messages"
-          value={mockAnalytics.totalMessages.toLocaleString()}
+          title="إجمالي الرسائل"
+          value={mockAnalytics.totalMessages.toLocaleString('ar-SA')}
           icon={MessageSquare}
           trend={{ value: 12, isPositive: true }}
         />
         <StatCard
-          title="Handovers"
+          title="التحويلات للدعم"
           value={mockAnalytics.handovers}
           icon={Users}
-          description="This week"
+          description="هذا الأسبوع"
         />
         <StatCard
-          title="Resolution Rate"
-          value="96.5%"
+          title="نسبة الحل"
+          value="٩٦.٥٪"
           icon={TrendingUp}
           trend={{ value: 2.3, isPositive: true }}
         />
         <StatCard
-          title="Active Channels"
+          title="القنوات النشطة"
           value={mockChannels.filter(c => c.isConnected).length}
           icon={Share2}
-          description={`of ${mockChannels.length} configured`}
+          description={`من ${mockChannels.length} قنوات`}
         />
       </div>
 
       {/* Chatbot Section */}
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Your Chatbot</h2>
+          <h2 className="text-lg font-semibold text-foreground">الشات بوت الخاص بك</h2>
         </div>
         <ChatbotCard chatbot={mockChatbot} />
       </section>
@@ -58,11 +58,11 @@ export default function DashboardPage() {
         {/* Channels Overview */}
         <div className="card-elevated p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Connected Channels</h3>
+            <h3 className="font-semibold text-foreground">القنوات المتصلة</h3>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard/channels">
-                View all
-                <ArrowUpRight className="ml-1 h-4 w-4" />
+                عرض الكل
+                <ArrowLeft className="mr-1 h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -76,8 +76,8 @@ export default function DashboardPage() {
                   <div className="rounded-lg bg-muted p-2">
                     <Share2 className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <span className="font-medium capitalize text-foreground">
-                    {channel.platform}
+                  <span className="font-medium text-foreground">
+                    {channel.platform === 'telegram' ? 'تيليجرام' : 'ماسنجر'}
                   </span>
                 </div>
                 <StatusBadge status={channel.isConnected ? 'connected' : 'disconnected'} />
@@ -89,11 +89,11 @@ export default function DashboardPage() {
         {/* Top Questions */}
         <div className="card-elevated p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Top Questions</h3>
+            <h3 className="font-semibold text-foreground">الأسئلة الأكثر شيوعاً</h3>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard/analytics">
-                View analytics
-                <ArrowUpRight className="ml-1 h-4 w-4" />
+                الإحصائيات
+                <ArrowLeft className="mr-1 h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -104,7 +104,7 @@ export default function DashboardPage() {
                 className="flex items-center justify-between rounded-lg border border-border p-3"
               >
                 <span className="truncate text-sm text-foreground">{item.question}</span>
-                <span className="ml-2 shrink-0 text-sm font-medium text-muted-foreground">
+                <span className="mr-2 shrink-0 text-sm font-medium text-muted-foreground">
                   {item.count}
                 </span>
               </div>

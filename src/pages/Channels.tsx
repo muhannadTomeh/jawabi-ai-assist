@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { Share2, ExternalLink, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
@@ -6,14 +5,14 @@ import { mockChannels } from '@/data/mockData';
 
 const channelInfo = {
   telegram: {
-    name: 'Telegram',
-    description: 'Connect your Telegram bot to respond to messages automatically',
+    name: 'تيليجرام',
+    description: 'اربط بوت تيليجرام للرد على الرسائل تلقائياً',
     color: 'bg-[#0088cc]/10',
     textColor: 'text-[#0088cc]',
   },
   messenger: {
-    name: 'Facebook Messenger',
-    description: 'Integrate with Facebook Messenger to handle customer inquiries',
+    name: 'فيسبوك ماسنجر',
+    description: 'اربط صفحة فيسبوك للرد على استفسارات العملاء',
     color: 'bg-[#0084ff]/10',
     textColor: 'text-[#0084ff]',
   },
@@ -24,9 +23,9 @@ export default function ChannelsPage() {
     <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Channels</h1>
+        <h1 className="text-2xl font-semibold text-foreground">القنوات</h1>
         <p className="mt-1 text-muted-foreground">
-          Connect your chatbot to messaging platforms
+          اربط الشات بوت بمنصات المراسلة
         </p>
       </div>
 
@@ -57,17 +56,17 @@ export default function ChannelsPage() {
                 {channel.isConnected ? (
                   <>
                     <Button variant="outline" size="sm">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Configure
+                      <Settings className="ml-2 h-4 w-4" />
+                      إعدادات
                     </Button>
                     <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                      Disconnect
+                      إلغاء الربط
                     </Button>
                   </>
                 ) : (
                   <Button size="sm">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Connect
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                    ربط
                   </Button>
                 )}
               </div>
@@ -78,9 +77,9 @@ export default function ChannelsPage() {
 
       {/* Coming Soon */}
       <div className="card-elevated border-dashed p-6">
-        <h3 className="font-semibold text-foreground">More Channels Coming Soon</h3>
+        <h3 className="font-semibold text-foreground">قنوات قادمة قريباً</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          WhatsApp, Instagram, and more integrations are on the roadmap.
+          واتساب، انستجرام، والمزيد من القنوات في خطة التطوير.
         </p>
       </div>
     </div>
