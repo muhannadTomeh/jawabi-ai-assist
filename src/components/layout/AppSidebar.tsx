@@ -8,9 +8,11 @@ import {
   MessageSquare,
   LogOut,
   User,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminCheck } from '@/hooks/useAdminCheck';
 
 const navigation = [
   { name: 'لوحة التحكم', href: '/dashboard', icon: Bot },
@@ -24,6 +26,7 @@ const navigation = [
 export function AppSidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdminCheck();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -66,6 +69,20 @@ export function AppSidebar() {
               </Link>
             );
           })}
+          
+          {/* Admin Link */}
+          {isAdmin && (
+            <Link
+              to="/dashboard/admin"
+              className={cn(
+                'nav-item mt-4 border-t border-sidebar-border pt-4',
+                isActive('/dashboard/admin') ? 'nav-item-active' : 'nav-item-inactive'
+              )}
+            >
+              <ShieldCheck className="h-5 w-5 text-amber-500" />
+              <span>لوحة الأدمن</span>
+            </Link>
+          )}
         </nav>
 
         {/* User section */}
