@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Save, Bot, MessageSquare, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Save, Bot, MessageSquare, Shield, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,18 +13,61 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockChatbot, mockHandoverSettings } from '@/data/mockData';
+import { useChatbot } from '@/hooks/useChatbot';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
-  const [botName, setBotName] = useState(mockChatbot.name);
+  const { chatbot, loading, updateChatbot } = useChatbot();
+  const [saving, setSaving] = useState(false);
+
+  const [botName, setBotName] = useState('');
   const [language, setLanguage] = useState('العربية');
-  const [tone, setTone] = useState(mockChatbot.tone);
-  const [fallbackMessage, setFallbackMessage] = useState('عذراً، لم أستطع فهم سؤالك. سيتواصل معك أحد أعضاء الفريق قريباً.');
-  
-  const [handoverEnabled, setHandoverEnabled] = useState(mockHandoverSettings.enabled);
-  const [lowConfidence, setLowConfidence] = useState(mockHandoverSettings.triggerOnLowConfidence);
+  const [tone, setTone] = useState('professional');
+  const [fallbackMessage, setFallbackMessage] = useState('');
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [customInstructions, setCustomInstructions] = useState('');
+
+  const [handoverEnabled, setHandoverEnabled] = useState(true);
+  const [lowConfidence, setLowConfidence] = useState(true);
   const [keywords, setKeywords] = useState('بشري، موظف، مساعدة، دعم');
-  const [handoverMessage, setHandoverMessage] = useState('سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة. يرجى الانتظار لحظة.');
+  const [handoverMessage, setHandoverMessage] = useState('');
+
+  useEffect(() => {
+    if (chatbot) {
+      setBotName(chatbot.name);
+      setLanguage(chatbot.language);
+      setTone(chatbot.tone);
+      setFallbackMessage(chatbot.fallback_message);
+      setWelcomeMessage((chatbot as any).welcome_message || '');
+      setCustomInstructions((chatbot as any).custom_instructions || '');
+    }
+  }, [chatbot]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const result = await updateChatbot({
+      name: botName,
+      language,
+      tone,
+      fallback_message: fallbackMessage,
+      welcome_message: welcomeMessage,
+      custom_instructions: customInstructions,
+    } as any);
+    setSaving(false);
+    if (result?.success) {
+      toast.success('تم حفظ الإعدادات بنجاح');
+    } else {
+      toast.error('حدث خطأ أثناء حفظ الإعدادات');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -36,8 +79,8 @@ export default function SettingsPage() {
             تخصيص سلوك الشات بوت وردوده
           </p>
         </div>
-        <Button>
-          <Save className="ml-2 h-4 w-4" />
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
           حفظ التغييرات
         </Button>
       </div>
@@ -104,16 +147,44 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="welcome">رسالة الترحيب</Label>
+                <Textarea
+                  id="welcome"
+                  value={welcomeMessage}
+                  onChange={(e) => setWelcomeMessage(e.target.value)}
+                  rows={2}
+                  placeholder="مثال: مرحباً! كيف يمكنني مساعدتك اليوم؟"
+                />
+                <p className="text-xs text-muted-foreground">
+                  هذه الرسالة تُرسل تلقائياً عند بدء محادثة جديدة مع البوت.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="fallback">رسالة عدم الفهم</Label>
                 <Textarea
                   id="fallback"
                   value={fallbackMessage}
                   onChange={(e) => setFallbackMessage(e.target.value)}
-                  rows={3}
+                  rows={2}
                   placeholder="الرسالة التي تظهر عندما لا يفهم البوت السؤال..."
                 />
                 <p className="text-xs text-muted-foreground">
                   هذه الرسالة تُرسل عندما لا يستطيع الشات بوت فهم طلب المستخدم.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="instructions">تعليمات إضافية للبوت</Label>
+                <Textarea
+                  id="instructions"
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  rows={4}
+                  placeholder="مثال: إذا سأل المستخدم عن الأسعار، وجّهه للتواصل مع المبيعات. لا تجب عن الأسئلة السياسية..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  أوامر وتعليمات مخصصة تحدد كيف يتعامل البوت مع الأسئلة خارج قاعدة المعرفة.
                 </p>
               </div>
             </div>

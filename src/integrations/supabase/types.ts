@@ -52,6 +52,7 @@ export type Database = {
       chatbots: {
         Row: {
           created_at: string
+          custom_instructions: string
           fallback_message: string
           id: string
           is_active: boolean
@@ -60,9 +61,11 @@ export type Database = {
           tone: string
           updated_at: string
           user_id: string
+          welcome_message: string
         }
         Insert: {
           created_at?: string
+          custom_instructions?: string
           fallback_message?: string
           id?: string
           is_active?: boolean
@@ -71,9 +74,11 @@ export type Database = {
           tone?: string
           updated_at?: string
           user_id: string
+          welcome_message?: string
         }
         Update: {
           created_at?: string
+          custom_instructions?: string
           fallback_message?: string
           id?: string
           is_active?: boolean
@@ -82,6 +87,7 @@ export type Database = {
           tone?: string
           updated_at?: string
           user_id?: string
+          welcome_message?: string
         }
         Relationships: []
       }
