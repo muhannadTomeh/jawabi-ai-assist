@@ -24,8 +24,60 @@ interface TelegramUpdate {
   };
 }
 
+async function generateAIResponse(
+  userMessage: string,
+  knowledgeContext: string,
+  chatbot: { name: string; tone: string; language: string; fallback_message: string }
+): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    console.error("LOVABLE_API_KEY not configured, using fallback");
+    return chatbot.fallback_message;
+  }
+
+  const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}".
+نبرتك: ${chatbot.tone}
+اللغة: ${chatbot.language}
+
+قاعدة المعرفة الخاصة بك:
+${knowledgeContext || "لا توجد معلومات في قاعدة المعرفة حالياً."}
+
+التعليمات:
+- أجب على أسئلة المستخدم بناءً على قاعدة المعرفة المتاحة فقط.
+- إذا لم تجد إجابة في قاعدة المعرفة، أجب بـ: "${chatbot.fallback_message}"
+- كن مختصراً ومفيداً.
+- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI gateway error:", response.status, await response.text());
+      return chatbot.fallback_message;
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || chatbot.fallback_message;
+  } catch (error) {
+    console.error("AI call failed:", error);
+    return chatbot.fallback_message;
+  }
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -35,7 +87,6 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Get bot token from URL path
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/");
     const botToken = pathParts[pathParts.length - 1];
@@ -47,7 +98,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Find the channel with this bot token
+    // Find channel
     const { data: channel, error: channelError } = await supabase
       .from("channels")
       .select("*, chatbots(*)")
@@ -64,7 +115,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Parse the incoming update
     const update: TelegramUpdate = await req.json();
     console.log("Received Telegram update:", JSON.stringify(update));
 
@@ -78,29 +128,31 @@ Deno.serve(async (req) => {
     const userMessage = update.message.text;
     const chatbot = channel.chatbots;
 
-    // Generate response based on knowledge base (simplified for now)
-    let responseText = chatbot.fallback_message;
-
-    // Check knowledge base for matching FAQ
-    const { data: faqs } = await supabase
+    // Build knowledge context from all knowledge items
+    const { data: knowledgeItems } = await supabase
       .from("knowledge_items")
       .select("*")
-      .eq("chatbot_id", chatbot.id)
-      .eq("type", "faq");
+      .eq("chatbot_id", chatbot.id);
 
-    if (faqs && faqs.length > 0) {
-      // Simple keyword matching
-      const matchedFaq = faqs.find(
-        (faq) =>
-          faq.question &&
-          userMessage.toLowerCase().includes(faq.question.toLowerCase())
-      );
-      if (matchedFaq && matchedFaq.answer) {
-        responseText = matchedFaq.answer;
+    let knowledgeContext = "";
+    if (knowledgeItems && knowledgeItems.length > 0) {
+      const parts: string[] = [];
+      for (const item of knowledgeItems) {
+        if (item.type === "faq" && item.question && item.answer) {
+          parts.push(`سؤال: ${item.question}\nجواب: ${item.answer}`);
+        } else if (item.type === "text" && item.content) {
+          parts.push(`${item.title}:\n${item.content}`);
+        } else if (item.type === "file" && item.content) {
+          parts.push(`ملف "${item.title}":\n${item.content}`);
+        }
       }
+      knowledgeContext = parts.join("\n\n---\n\n");
     }
 
-    // Send response to Telegram
+    // Generate AI response
+    const responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot);
+
+    // Send to Telegram
     const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
     const telegramResponse = await fetch(telegramApiUrl, {
       method: "POST",
@@ -112,8 +164,7 @@ Deno.serve(async (req) => {
     });
 
     if (!telegramResponse.ok) {
-      const errorData = await telegramResponse.text();
-      console.error("Telegram API error:", errorData);
+      console.error("Telegram API error:", await telegramResponse.text());
     }
 
     return new Response(JSON.stringify({ ok: true }), {
