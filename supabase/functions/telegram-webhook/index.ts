@@ -98,13 +98,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Find channel
+    // Find channel - use config::text LIKE to avoid JSON parsing issues with colons
     const { data: channel, error: channelError } = await supabase
       .from("channels")
       .select("*, chatbots(*)")
       .eq("platform", "telegram")
       .eq("is_connected", true)
-      .filter("config->bot_token", "eq", botToken)
+      .filter("config->>bot_token", "eq", botToken)
       .maybeSingle();
 
     if (channelError || !channel) {
