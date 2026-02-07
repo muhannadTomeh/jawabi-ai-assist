@@ -27,13 +27,17 @@ interface TelegramUpdate {
 async function generateAIResponse(
   userMessage: string,
   knowledgeContext: string,
-  chatbot: { name: string; tone: string; language: string; fallback_message: string }
+  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string }
 ): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     console.error("LOVABLE_API_KEY not configured, using fallback");
     return chatbot.fallback_message;
   }
+
+  const customInstructions = chatbot.custom_instructions
+    ? `\n\nتعليمات إضافية من المالك:\n${chatbot.custom_instructions}`
+    : "";
 
   const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}".
 نبرتك: ${chatbot.tone}
@@ -46,7 +50,7 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
 - أجب على أسئلة المستخدم بناءً على قاعدة المعرفة المتاحة فقط.
 - إذا لم تجد إجابة في قاعدة المعرفة، أجب بـ: "${chatbot.fallback_message}"
 - كن مختصراً ومفيداً.
-- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.`;
+- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.${customInstructions}`;
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -127,6 +131,20 @@ Deno.serve(async (req) => {
     const chatId = update.message.chat.id;
     const userMessage = update.message.text;
     const chatbot = channel.chatbots;
+
+    // Handle /start command with welcome message
+    if (userMessage === "/start") {
+      const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
+      const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(telegramApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: welcomeMsg }),
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Build knowledge context from all knowledge items
     const { data: knowledgeItems } = await supabase
