@@ -24,10 +24,17 @@ interface TelegramUpdate {
   };
 }
 
+function getDialectInstruction(dialect: string): string {
+  if (dialect === "palestinian") {
+    return `\n\nاللهجة: تحدث باللهجة العامية الفلسطينية. استخدم تعبيرات مثل "كيفك"، "شو"، "هلأ"، "إنشاء الله"، "يعطيك العافية" وما شابه. لا تستخدم الفصحى.`;
+  }
+  return `\n\nاللهجة: تحدث بالعربية الفصحى الرسمية.`;
+}
+
 async function generateAIResponse(
   userMessage: string,
   knowledgeContext: string,
-  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string },
+  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string },
   conversationHistory: { role: string; content: string }[]
 ): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -40,9 +47,11 @@ async function generateAIResponse(
     ? `\n\nتعليمات إضافية من المالك:\n${chatbot.custom_instructions}`
     : "";
 
+  const dialectInstruction = getDialectInstruction(chatbot.dialect || "formal");
+
   const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}".
 نبرتك: ${chatbot.tone}
-اللغة: ${chatbot.language}
+اللغة: ${chatbot.language}${dialectInstruction}
 
 قاعدة المعرفة الخاصة بك:
 ${knowledgeContext || "لا توجد معلومات في قاعدة المعرفة حالياً."}
@@ -52,6 +61,7 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
 - إذا لم تجد إجابة في قاعدة المعرفة، أجب بـ: "${chatbot.fallback_message}"
 - كن مختصراً ومفيداً.
 - لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.
+- لا ترحب بالمستخدم ولا تقل "أهلاً" أو "مرحباً" في بداية كل رد. ادخل في الموضوع مباشرة.
 - لديك ذاكرة محادثة - استخدم السياق السابق للرد بشكل متسق وطبيعي.${customInstructions}`;
 
   const messages = [
@@ -123,7 +133,7 @@ async function getConversationHistory(
     .eq("telegram_user_id", telegramUserId)
     .eq("chatbot_id", chatbotId)
     .order("created_at", { ascending: true })
-    .limit(10); // 5 pairs = 10 messages
+    .limit(10);
 
   return data || [];
 }
@@ -135,13 +145,11 @@ async function saveMessages(
   userMsg: string,
   assistantMsg: string
 ) {
-  // Insert both messages
   await supabase.from("telegram_messages").insert([
     { telegram_user_id: telegramUserId, chatbot_id: chatbotId, role: "user", content: userMsg },
     { telegram_user_id: telegramUserId, chatbot_id: chatbotId, role: "assistant", content: assistantMsg },
   ]);
 
-  // Cleanup: keep only last 10 messages (5 pairs)
   const { data: allMsgs } = await supabase
     .from("telegram_messages")
     .select("id, created_at")
@@ -209,10 +217,11 @@ Deno.serve(async (req) => {
     const chatbot = channel.chatbots;
     const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
-    // Handle /start command
+    // Register user (track new vs existing)
+    const { isNew } = await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
+
+    // Handle /start command - always send welcome
     if (userMessage === "/start") {
-      // Register user if new
-      await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
       const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
       await fetch(telegramApiUrl, {
         method: "POST",
@@ -224,10 +233,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if user is new (first message without /start)
-    const { isNew } = await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
-
-    // Send welcome for new users
+    // For new users (first message without /start), send welcome THEN process
     if (isNew) {
       const welcomeMsg = chatbot.welcome_message || `مرحباً ${firstName}! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
       await fetch(telegramApiUrl, {
@@ -264,7 +270,7 @@ Deno.serve(async (req) => {
     // Generate AI response with conversation history
     const responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
 
-    // Save messages to memory
+    // Save messages
     await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, responseText);
 
     // Send response
