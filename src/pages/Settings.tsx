@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [botName, setBotName] = useState('');
   const [language, setLanguage] = useState('العربية');
   const [tone, setTone] = useState('professional');
+  const [dialect, setDialect] = useState('formal');
   const [fallbackMessage, setFallbackMessage] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
@@ -37,6 +38,7 @@ export default function SettingsPage() {
       setBotName(chatbot.name);
       setLanguage(chatbot.language);
       setTone(chatbot.tone);
+      setDialect((chatbot as any).dialect || 'formal');
       setFallbackMessage(chatbot.fallback_message);
       setWelcomeMessage((chatbot as any).welcome_message || '');
       setCustomInstructions((chatbot as any).custom_instructions || '');
@@ -49,6 +51,7 @@ export default function SettingsPage() {
       name: botName,
       language,
       tone,
+      dialect,
       fallback_message: fallbackMessage,
       welcome_message: welcomeMessage,
       custom_instructions: customInstructions,
@@ -144,6 +147,22 @@ export default function SettingsPage() {
                     <SelectItem value="formal">رسمي</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dialect">لهجة البوت</Label>
+                <Select value={dialect} onValueChange={setDialect}>
+                  <SelectTrigger id="dialect">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="formal">عربية فصحى / رسمية</SelectItem>
+                    <SelectItem value="palestinian">عامية فلسطينية</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  حدد اللهجة التي سيتحدث بها البوت مع المستخدمين.
+                </p>
               </div>
 
               <div className="space-y-2 md:col-span-2">

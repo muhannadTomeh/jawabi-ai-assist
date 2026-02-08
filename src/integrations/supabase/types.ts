@@ -53,6 +53,7 @@ export type Database = {
         Row: {
           created_at: string
           custom_instructions: string
+          dialect: string
           fallback_message: string
           id: string
           is_active: boolean
@@ -66,6 +67,7 @@ export type Database = {
         Insert: {
           created_at?: string
           custom_instructions?: string
+          dialect?: string
           fallback_message?: string
           id?: string
           is_active?: boolean
@@ -79,6 +81,7 @@ export type Database = {
         Update: {
           created_at?: string
           custom_instructions?: string
+          dialect?: string
           fallback_message?: string
           id?: string
           is_active?: boolean
