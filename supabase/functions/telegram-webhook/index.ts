@@ -27,7 +27,8 @@ interface TelegramUpdate {
 async function generateAIResponse(
   userMessage: string,
   knowledgeContext: string,
-  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string }
+  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string },
+  conversationHistory: { role: string; content: string }[]
 ): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
@@ -50,7 +51,14 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
 - أجب على أسئلة المستخدم بناءً على قاعدة المعرفة المتاحة فقط.
 - إذا لم تجد إجابة في قاعدة المعرفة، أجب بـ: "${chatbot.fallback_message}"
 - كن مختصراً ومفيداً.
-- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.${customInstructions}`;
+- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.
+- لديك ذاكرة محادثة - استخدم السياق السابق للرد بشكل متسق وطبيعي.${customInstructions}`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory,
+    { role: "user", content: userMessage },
+  ];
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -61,10 +69,7 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
+        messages,
       }),
     });
 
@@ -78,6 +83,75 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
   } catch (error) {
     console.error("AI call failed:", error);
     return chatbot.fallback_message;
+  }
+}
+
+async function getOrCreateUser(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+  chatbotId: string,
+  firstName: string,
+  username?: string
+): Promise<{ isNew: boolean }> {
+  const { data: existing } = await supabase
+    .from("telegram_users")
+    .select("id")
+    .eq("telegram_user_id", telegramUserId)
+    .eq("chatbot_id", chatbotId)
+    .maybeSingle();
+
+  if (existing) return { isNew: false };
+
+  await supabase.from("telegram_users").insert({
+    telegram_user_id: telegramUserId,
+    chatbot_id: chatbotId,
+    first_name: firstName,
+    username: username || null,
+  });
+
+  return { isNew: true };
+}
+
+async function getConversationHistory(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+  chatbotId: string
+): Promise<{ role: string; content: string }[]> {
+  const { data } = await supabase
+    .from("telegram_messages")
+    .select("role, content")
+    .eq("telegram_user_id", telegramUserId)
+    .eq("chatbot_id", chatbotId)
+    .order("created_at", { ascending: true })
+    .limit(10); // 5 pairs = 10 messages
+
+  return data || [];
+}
+
+async function saveMessages(
+  supabase: ReturnType<typeof createClient>,
+  telegramUserId: number,
+  chatbotId: string,
+  userMsg: string,
+  assistantMsg: string
+) {
+  // Insert both messages
+  await supabase.from("telegram_messages").insert([
+    { telegram_user_id: telegramUserId, chatbot_id: chatbotId, role: "user", content: userMsg },
+    { telegram_user_id: telegramUserId, chatbot_id: chatbotId, role: "assistant", content: assistantMsg },
+  ]);
+
+  // Cleanup: keep only last 10 messages (5 pairs)
+  const { data: allMsgs } = await supabase
+    .from("telegram_messages")
+    .select("id, created_at")
+    .eq("telegram_user_id", telegramUserId)
+    .eq("chatbot_id", chatbotId)
+    .order("created_at", { ascending: false });
+
+  if (allMsgs && allMsgs.length > 10) {
+    const idsToDelete = allMsgs.slice(10).map((m) => m.id);
+    await supabase.from("telegram_messages").delete().in("id", idsToDelete);
   }
 }
 
@@ -102,7 +176,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Find channel - use config::text LIKE to avoid JSON parsing issues with colons
     const { data: channel, error: channelError } = await supabase
       .from("channels")
       .select("*, chatbots(*)")
@@ -129,13 +202,18 @@ Deno.serve(async (req) => {
     }
 
     const chatId = update.message.chat.id;
+    const telegramUserId = update.message.from.id;
+    const firstName = update.message.from.first_name;
+    const username = update.message.from.username;
     const userMessage = update.message.text;
     const chatbot = channel.chatbots;
+    const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
-    // Handle /start command with welcome message
+    // Handle /start command
     if (userMessage === "/start") {
+      // Register user if new
+      await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
       const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
-      const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
       await fetch(telegramApiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,7 +224,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build knowledge context from all knowledge items
+    // Check if user is new (first message without /start)
+    const { isNew } = await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
+
+    // Send welcome for new users
+    if (isNew) {
+      const welcomeMsg = chatbot.welcome_message || `مرحباً ${firstName}! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
+      await fetch(telegramApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: welcomeMsg }),
+      });
+    }
+
+    // Get conversation history
+    const conversationHistory = await getConversationHistory(supabase, telegramUserId, chatbot.id);
+
+    // Build knowledge context
     const { data: knowledgeItems } = await supabase
       .from("knowledge_items")
       .select("*")
@@ -167,18 +261,17 @@ Deno.serve(async (req) => {
       knowledgeContext = parts.join("\n\n---\n\n");
     }
 
-    // Generate AI response
-    const responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot);
+    // Generate AI response with conversation history
+    const responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
 
-    // Send to Telegram
-    const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    // Save messages to memory
+    await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, responseText);
+
+    // Send response
     const telegramResponse = await fetch(telegramApiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: responseText,
-      }),
+      body: JSON.stringify({ chat_id: chatId, text: responseText }),
     });
 
     if (!telegramResponse.ok) {

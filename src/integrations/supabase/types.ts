@@ -212,6 +212,76 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_messages: {
+        Row: {
+          chatbot_id: string
+          content: string
+          created_at: string
+          id: string
+          role: string
+          telegram_user_id: number
+        }
+        Insert: {
+          chatbot_id: string
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          telegram_user_id: number
+        }
+        Update: {
+          chatbot_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          telegram_user_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_messages_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_users: {
+        Row: {
+          chatbot_id: string
+          created_at: string
+          first_name: string | null
+          id: string
+          telegram_user_id: number
+          username: string | null
+        }
+        Insert: {
+          chatbot_id: string
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          telegram_user_id: number
+          username?: string | null
+        }
+        Update: {
+          chatbot_id?: string
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          telegram_user_id?: number
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_users_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
