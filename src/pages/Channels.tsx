@@ -49,20 +49,38 @@ export default function ChannelsPage() {
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [messengerDialogOpen, setMessengerDialogOpen] = useState(false);
   const [disconnectChannel, setDisconnectChannel] = useState<Channel | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
   const { toast } = useToast();
 
   const fetchChannels = async () => {
     if (!chatbot) return;
 
     try {
-      const { data, error } = await supabase
-        .from('channels')
-        .select('*')
-        .eq('chatbot_id', chatbot.id);
+      // Fetch channels via edge function to get sanitized config (no tokens)
+      const { data, error } = await supabase.functions.invoke('manage-channel', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: undefined,
+      });
 
-      if (error) throw error;
+      // Fallback: use query params approach
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const session = (await supabase.auth.getSession()).data.session;
 
-      setChannels((data as Channel[]) || []);
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/manage-channel?action=list&chatbot_id=${chatbot.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to fetch channels');
+      const result = await response.json();
+      setChannels((result.channels as Channel[]) || []);
     } catch (error) {
       console.error('Error fetching channels:', error);
     } finally {
@@ -82,22 +100,30 @@ export default function ChannelsPage() {
 
   const handleDisconnect = async () => {
     if (!disconnectChannel) return;
+    setDisconnecting(true);
 
     try {
-      // If Telegram, remove webhook
-      if (disconnectChannel.platform === 'telegram' && disconnectChannel.config?.bot_token) {
-        await fetch(
-          `https://api.telegram.org/bot${disconnectChannel.config.bot_token}/deleteWebhook`
-        );
+      // Disconnect via server-side edge function (tokens never touch client)
+      const session = (await supabase.auth.getSession()).data.session;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/manage-channel?action=disconnect`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ channel_id: disconnectChannel.id }),
+        }
+      );
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to disconnect');
       }
-
-      // Update channel in database
-      const { error } = await supabase
-        .from('channels')
-        .update({ is_connected: false, config: null })
-        .eq('id', disconnectChannel.id);
-
-      if (error) throw error;
 
       toast({
         title: 'تم إلغاء الربط',
@@ -114,6 +140,7 @@ export default function ChannelsPage() {
       });
     } finally {
       setDisconnectChannel(null);
+      setDisconnecting(false);
     }
   };
 
@@ -260,12 +287,20 @@ export default function ChannelsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogCancel disabled={disconnecting}>إلغاء</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDisconnect}
+              disabled={disconnecting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              إلغاء الربط
+              {disconnecting ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جاري إلغاء الربط...
+                </>
+              ) : (
+                'إلغاء الربط'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
