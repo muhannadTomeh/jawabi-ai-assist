@@ -58,7 +58,12 @@ export function MessengerConnectDialog({
 
     const initSDK = async () => {
       // Fetch app ID from edge function
-      const { data } = await supabase.functions.invoke('facebook-oauth?action=get-app-id');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/facebook-oauth?action=get-app-id`, {
+        headers: { apikey: supabaseKey },
+      });
+      const data = await res.json();
       const appId = data?.app_id;
       if (!appId) {
         console.error('Could not fetch Facebook App ID');
@@ -125,8 +130,8 @@ export function MessengerConnectDialog({
 
         try {
           // Send token to edge function to get pages
-          const { data, error } = await supabase.functions.invoke('facebook-oauth?action=get-pages', {
-            body: { user_access_token: userAccessToken },
+          const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+            body: { action: 'get-pages', user_access_token: userAccessToken },
           });
 
           if (error || data?.error) {
@@ -153,8 +158,9 @@ export function MessengerConnectDialog({
     setStep('connecting');
 
     try {
-      const { data, error } = await supabase.functions.invoke('facebook-oauth?action=connect-page', {
+      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
         body: {
+          action: 'connect-page',
           chatbot_id: chatbotId,
           page_id: page.id,
           page_name: page.name,

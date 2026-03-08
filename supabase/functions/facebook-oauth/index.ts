@@ -21,12 +21,9 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-// NEW: Get pages using short-lived user token from FB SDK
-async function handleGetPages(req: Request): Promise<Response> {
-  const { user_access_token } = await req.json();
-  if (!user_access_token) {
-    return jsonResponse({ error: "Missing user_access_token" }, 400);
-  }
+// Get pages using short-lived user token from FB SDK
+async function handleGetPagesFromBody(body: any): Promise<Response> {
+  const { user_access_token } = body;
 
   const appId = getEnv("FACEBOOK_APP_ID");
   const appSecret = getEnv("FACEBOOK_APP_SECRET");
@@ -67,25 +64,18 @@ async function handleGetPages(req: Request): Promise<Response> {
     return jsonResponse({ error: "لا توجد صفحات فيسبوك مرتبطة بحسابك" }, 400);
   }
 
-  // Return pages (without exposing page access tokens to frontend)
   const pages = pagesData.data.map((p: any) => ({
     id: p.id,
     name: p.name,
     picture: p.picture?.data?.url || null,
-    // Store access_token server-side only - encode in a temp map
     access_token: p.access_token,
   }));
 
   return jsonResponse({ pages });
 }
 
-// NEW: Connect a selected page
-async function handleConnectPage(req: Request): Promise<Response> {
-  const { chatbot_id, page_id, page_name, page_access_token } = await req.json();
-
-  if (!chatbot_id || !page_id || !page_access_token) {
-    return jsonResponse({ error: "بيانات ناقصة" }, 400);
-  }
+async function handleConnectPageFromBody(body: any): Promise<Response> {
+  const { chatbot_id, page_id, page_name, page_access_token } = body;
 
   const supabaseUrl = getEnv("SUPABASE_URL");
   const supabaseServiceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
@@ -185,20 +175,35 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const action = url.searchParams.get("action");
+  let action = url.searchParams.get("action");
 
   try {
+    // GET request for app ID
     if (req.method === "GET" && action === "get-app-id") {
       const appId = getEnv("FACEBOOK_APP_ID");
       return jsonResponse({ app_id: appId });
     }
 
-    if (req.method === "POST" && action === "get-pages") {
-      return await handleGetPages(req);
-    }
+    // For POST requests, parse body and check action
+    if (req.method === "POST") {
+      const body = await req.json();
+      if (!action && body.action) {
+        action = body.action;
+      }
 
-    if (req.method === "POST" && action === "connect-page") {
-      return await handleConnectPage(req);
+      if (action === "get-pages") {
+        if (!body.user_access_token) {
+          return jsonResponse({ error: "Missing user_access_token" }, 400);
+        }
+        return await handleGetPagesFromBody(body);
+      }
+
+      if (action === "connect-page") {
+        if (!body.chatbot_id || !body.page_id || !body.page_access_token) {
+          return jsonResponse({ error: "بيانات ناقصة" }, 400);
+        }
+        return await handleConnectPageFromBody(body);
+      }
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);
