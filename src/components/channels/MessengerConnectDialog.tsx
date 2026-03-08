@@ -134,37 +134,43 @@ export function MessengerConnectDialog({
 
     setLoading(true);
 
-    window.FB.login(
-      (response: any) => {
-        if (response.status !== 'connected' || !response.authResponse?.accessToken) {
-          setLoading(false);
-          toast.error('تم إلغاء تسجيل الدخول');
-          return;
-        }
-
-        const userAccessToken = response.authResponse.accessToken;
-
-        // Handle async work outside the callback
-        supabase.functions.invoke('facebook-oauth', {
-          body: { action: 'get-pages', user_access_token: userAccessToken },
-        }).then(({ data, error }) => {
-          if (error || data?.error) {
-            toast.error(data?.error || error?.message || 'فشل في جلب الصفحات');
-          } else {
-            setPages(data.pages || []);
-            setStep('select-page');
+    try {
+      window.FB.login(
+        (response: any) => {
+          if (response.status !== 'connected' || !response.authResponse?.accessToken) {
+            setLoading(false);
+            toast.error('تم إلغاء تسجيل الدخول');
+            return;
           }
-        }).catch((err: any) => {
-          console.error('Get pages error:', err);
-          toast.error(err.message || 'فشل في جلب الصفحات');
-        }).finally(() => {
-          setLoading(false);
-        });
-      },
-      {
-        scope: 'pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement',
-      }
-    );
+
+          const userAccessToken = response.authResponse.accessToken;
+
+          // Handle async work outside the callback
+          supabase.functions.invoke('facebook-oauth', {
+            body: { action: 'get-pages', user_access_token: userAccessToken },
+          }).then(({ data, error }) => {
+            if (error || data?.error) {
+              toast.error(data?.error || error?.message || 'فشل في جلب الصفحات');
+            } else {
+              setPages(data.pages || []);
+              setStep('select-page');
+            }
+          }).catch((err: any) => {
+            console.error('Get pages error:', err);
+            toast.error(err.message || 'فشل في جلب الصفحات');
+          }).finally(() => {
+            setLoading(false);
+          });
+        },
+        {
+          scope: 'pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement',
+        }
+      );
+    } catch (error) {
+      console.error('FB.login failed:', error);
+      toast.error('تعذر فتح نافذة تسجيل الدخول بفيسبوك');
+      setLoading(false);
+    }
   }, []);
 
   const handleSelectPage = async (page: FacebookPage) => {
