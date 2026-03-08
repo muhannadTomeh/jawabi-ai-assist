@@ -188,6 +188,11 @@ Deno.serve(async (req) => {
   const action = url.searchParams.get("action");
 
   try {
+    if (req.method === "GET" && action === "get-app-id") {
+      const appId = getEnv("FACEBOOK_APP_ID");
+      return jsonResponse({ app_id: appId });
+    }
+
     if (req.method === "POST" && action === "get-pages") {
       return await handleGetPages(req);
     }
