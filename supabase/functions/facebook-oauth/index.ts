@@ -21,12 +21,9 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-// NEW: Get pages using short-lived user token from FB SDK
-async function handleGetPages(req: Request): Promise<Response> {
-  const { user_access_token } = await req.json();
-  if (!user_access_token) {
-    return jsonResponse({ error: "Missing user_access_token" }, 400);
-  }
+// Get pages using short-lived user token from FB SDK
+async function handleGetPagesFromBody(body: any): Promise<Response> {
+  const { user_access_token } = body;
 
   const appId = getEnv("FACEBOOK_APP_ID");
   const appSecret = getEnv("FACEBOOK_APP_SECRET");
@@ -67,12 +64,10 @@ async function handleGetPages(req: Request): Promise<Response> {
     return jsonResponse({ error: "لا توجد صفحات فيسبوك مرتبطة بحسابك" }, 400);
   }
 
-  // Return pages (without exposing page access tokens to frontend)
   const pages = pagesData.data.map((p: any) => ({
     id: p.id,
     name: p.name,
     picture: p.picture?.data?.url || null,
-    // Store access_token server-side only - encode in a temp map
     access_token: p.access_token,
   }));
 
