@@ -74,13 +74,8 @@ async function handleGetPagesFromBody(body: any): Promise<Response> {
   return jsonResponse({ pages });
 }
 
-// NEW: Connect a selected page
-async function handleConnectPage(req: Request): Promise<Response> {
-  const { chatbot_id, page_id, page_name, page_access_token } = await req.json();
-
-  if (!chatbot_id || !page_id || !page_access_token) {
-    return jsonResponse({ error: "بيانات ناقصة" }, 400);
-  }
+async function handleConnectPageFromBody(body: any): Promise<Response> {
+  const { chatbot_id, page_id, page_name, page_access_token } = body;
 
   const supabaseUrl = getEnv("SUPABASE_URL");
   const supabaseServiceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
