@@ -188,17 +188,51 @@ Deno.serve(async (req) => {
   const action = url.searchParams.get("action");
 
   try {
+    // GET request for app ID
     if (req.method === "GET" && action === "get-app-id") {
       const appId = getEnv("FACEBOOK_APP_ID");
       return jsonResponse({ app_id: appId });
     }
 
-    if (req.method === "POST" && action === "get-pages") {
-      return await handleGetPages(req);
+    // For POST requests, also check action from body if not in query
+    let bodyAction = action;
+    let body: any = {};
+    
+    if (req.method === "POST") {
+      const cloned = req.clone();
+      try {
+        body = await cloned.json();
+        if (!bodyAction && body.action) {
+          bodyAction = body.action;
+        }
+      } catch {
+        // No JSON body
+      }
     }
 
-    if (req.method === "POST" && action === "connect-page") {
-      return await handleConnectPage(req);
+    if (req.method === "POST" && (bodyAction === "get-pages" || action === "get-pages")) {
+      // Re-parse body if needed
+      if (!body.user_access_token) {
+        body = await req.json();
+      }
+      const fakeReq = new Request(req.url, {
+        method: "POST",
+        headers: req.headers,
+        body: JSON.stringify(body),
+      });
+      return await handleGetPages(fakeReq);
+    }
+
+    if (req.method === "POST" && (bodyAction === "connect-page" || action === "connect-page")) {
+      if (!body.chatbot_id) {
+        body = await req.json();
+      }
+      const fakeReq = new Request(req.url, {
+        method: "POST",
+        headers: req.headers,
+        body: JSON.stringify(body),
+      });
+      return await handleConnectPage(fakeReq);
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);

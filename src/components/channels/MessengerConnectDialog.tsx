@@ -58,7 +58,12 @@ export function MessengerConnectDialog({
 
     const initSDK = async () => {
       // Fetch app ID from edge function
-      const { data } = await supabase.functions.invoke('facebook-oauth?action=get-app-id');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/facebook-oauth?action=get-app-id`, {
+        headers: { apikey: supabaseKey },
+      });
+      const data = await res.json();
       const appId = data?.app_id;
       if (!appId) {
         console.error('Could not fetch Facebook App ID');
