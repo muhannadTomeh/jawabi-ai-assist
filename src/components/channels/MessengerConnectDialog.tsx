@@ -49,31 +49,46 @@ export function MessengerConnectDialog({
   const [step, setStep] = useState<'login' | 'select-page' | 'connecting' | 'done'>('login');
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
 
-  // Load Facebook SDK
+  // Load Facebook SDK - fetch app ID from edge function then init
   useEffect(() => {
     if (window.FB) {
       setSdkLoaded(true);
       return;
     }
 
-    window.fbAsyncInit = () => {
-      window.FB.init({
-        appId: import.meta.env.VITE_FACEBOOK_APP_ID || '',
-        cookie: true,
-        xfbml: false,
-        version: 'v21.0',
-      });
-      setSdkLoaded(true);
+    const initSDK = async () => {
+      // Fetch app ID from edge function
+      const { data } = await supabase.functions.invoke('facebook-oauth?action=get-app-id');
+      const appId = data?.app_id;
+      if (!appId) {
+        console.error('Could not fetch Facebook App ID');
+        return;
+      }
+
+      window.fbAsyncInit = () => {
+        window.FB.init({
+          appId,
+          cookie: true,
+          xfbml: false,
+          version: 'v21.0',
+        });
+        setSdkLoaded(true);
+      };
+
+      if (!document.getElementById('facebook-jssdk')) {
+        const script = document.createElement('script');
+        script.id = 'facebook-jssdk';
+        script.src = 'https://connect.facebook.net/en_US/sdk.js';
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+      } else {
+        // Script already loaded but FB not initialized
+        window.fbAsyncInit();
+      }
     };
 
-    if (!document.getElementById('facebook-jssdk')) {
-      const script = document.createElement('script');
-      script.id = 'facebook-jssdk';
-      script.src = 'https://connect.facebook.net/en_US/sdk.js';
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    }
+    initSDK();
   }, []);
 
   // Reset state when dialog opens
