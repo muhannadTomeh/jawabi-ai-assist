@@ -56,15 +56,6 @@ export default function ChannelsPage() {
     if (!chatbot) return;
 
     try {
-      // Fetch channels via edge function to get sanitized config (no tokens)
-      const { data, error } = await supabase.functions.invoke('manage-channel', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        body: undefined,
-      });
-
-      // Fallback: use query params approach
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const session = (await supabase.auth.getSession()).data.session;
 
