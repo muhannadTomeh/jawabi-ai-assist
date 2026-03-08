@@ -130,8 +130,8 @@ export function MessengerConnectDialog({
 
         try {
           // Send token to edge function to get pages
-          const { data, error } = await supabase.functions.invoke('facebook-oauth?action=get-pages', {
-            body: { user_access_token: userAccessToken },
+          const { data, error } = await supabase.functions.invoke('facebook-oauth', {
+            body: { action: 'get-pages', user_access_token: userAccessToken },
           });
 
           if (error || data?.error) {
