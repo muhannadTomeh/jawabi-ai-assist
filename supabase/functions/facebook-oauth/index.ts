@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const action = url.searchParams.get("action");
+  let action = url.searchParams.get("action");
 
   try {
     // GET request for app ID
@@ -194,45 +194,26 @@ Deno.serve(async (req) => {
       return jsonResponse({ app_id: appId });
     }
 
-    // For POST requests, also check action from body if not in query
-    let bodyAction = action;
-    let body: any = {};
-    
+    // For POST requests, parse body and check action
     if (req.method === "POST") {
-      const cloned = req.clone();
-      try {
-        body = await cloned.json();
-        if (!bodyAction && body.action) {
-          bodyAction = body.action;
+      const body = await req.json();
+      if (!action && body.action) {
+        action = body.action;
+      }
+
+      if (action === "get-pages") {
+        if (!body.user_access_token) {
+          return jsonResponse({ error: "Missing user_access_token" }, 400);
         }
-      } catch {
-        // No JSON body
+        return await handleGetPagesFromBody(body);
       }
-    }
 
-    if (req.method === "POST" && (bodyAction === "get-pages" || action === "get-pages")) {
-      // Re-parse body if needed
-      if (!body.user_access_token) {
-        body = await req.json();
+      if (action === "connect-page") {
+        if (!body.chatbot_id || !body.page_id || !body.page_access_token) {
+          return jsonResponse({ error: "بيانات ناقصة" }, 400);
+        }
+        return await handleConnectPageFromBody(body);
       }
-      const fakeReq = new Request(req.url, {
-        method: "POST",
-        headers: req.headers,
-        body: JSON.stringify(body),
-      });
-      return await handleGetPages(fakeReq);
-    }
-
-    if (req.method === "POST" && (bodyAction === "connect-page" || action === "connect-page")) {
-      if (!body.chatbot_id) {
-        body = await req.json();
-      }
-      const fakeReq = new Request(req.url, {
-        method: "POST",
-        headers: req.headers,
-        body: JSON.stringify(body),
-      });
-      return await handleConnectPage(fakeReq);
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);
