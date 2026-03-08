@@ -158,8 +158,9 @@ export function MessengerConnectDialog({
     setStep('connecting');
 
     try {
-      const { data, error } = await supabase.functions.invoke('facebook-oauth?action=connect-page', {
+      const { data, error } = await supabase.functions.invoke('facebook-oauth', {
         body: {
+          action: 'connect-page',
           chatbot_id: chatbotId,
           page_id: page.id,
           page_name: page.name,
