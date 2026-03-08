@@ -73,7 +73,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-6" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
