@@ -119,7 +119,7 @@ export function MessengerConnectDialog({
     setLoading(true);
 
     window.FB.login(
-      async (response: any) => {
+      (response: any) => {
         if (response.status !== 'connected' || !response.authResponse?.accessToken) {
           setLoading(false);
           toast.error('تم إلغاء تسجيل الدخول');
@@ -128,24 +128,22 @@ export function MessengerConnectDialog({
 
         const userAccessToken = response.authResponse.accessToken;
 
-        try {
-          // Send token to edge function to get pages
-          const { data, error } = await supabase.functions.invoke('facebook-oauth', {
-            body: { action: 'get-pages', user_access_token: userAccessToken },
-          });
-
+        // Handle async work outside the callback
+        supabase.functions.invoke('facebook-oauth', {
+          body: { action: 'get-pages', user_access_token: userAccessToken },
+        }).then(({ data, error }) => {
           if (error || data?.error) {
-            throw new Error(data?.error || error?.message || 'فشل في جلب الصفحات');
+            toast.error(data?.error || error?.message || 'فشل في جلب الصفحات');
+          } else {
+            setPages(data.pages || []);
+            setStep('select-page');
           }
-
-          setPages(data.pages || []);
-          setStep('select-page');
-        } catch (err: any) {
+        }).catch((err: any) => {
           console.error('Get pages error:', err);
           toast.error(err.message || 'فشل في جلب الصفحات');
-        } finally {
+        }).finally(() => {
           setLoading(false);
-        }
+        });
       },
       {
         scope: 'pages_messaging,pages_show_list,pages_manage_metadata,pages_read_engagement',
