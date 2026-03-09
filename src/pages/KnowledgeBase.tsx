@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useChatbot } from '@/hooks/useChatbot';
 import { useToast } from '@/hooks/use-toast';
 import { AddContentDialog } from '@/components/knowledge/AddContentDialog';
+import { EditContentDialog } from '@/components/knowledge/EditContentDialog';
 import { FileUploadDialog } from '@/components/knowledge/FileUploadDialog';
 
 interface KnowledgeItem {
