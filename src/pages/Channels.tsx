@@ -17,6 +17,7 @@ import { useChatbot } from '@/hooks/useChatbot';
 import { useToast } from '@/hooks/use-toast';
 import { TelegramConnectDialog } from '@/components/channels/TelegramConnectDialog';
 import { MessengerConnectDialog } from '@/components/channels/MessengerConnectDialog';
+import { WhatsAppConnectDialog } from '@/components/channels/WhatsAppConnectDialog';
 
 interface Channel {
   id: string;
