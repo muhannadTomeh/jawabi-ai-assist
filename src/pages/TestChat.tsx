@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useChatbot } from '@/hooks/useChatbot';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -15,29 +17,84 @@ interface Message {
 
 export default function TestChatPage() {
   const { chatbot, loading: chatbotLoading } = useChatbot();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Set welcome message when chatbot loads
+  // Load chat history from DB on mount
   useEffect(() => {
-    if (chatbot && messages.length === 0) {
-      setMessages([
-        {
-          id: '1',
-          role: 'bot',
-          content: chatbot.welcome_message || 'مرحباً! كيف يمكنني مساعدتك اليوم؟',
-          timestamp: new Date(),
-        },
-      ]);
+    async function loadHistory() {
+      if (!chatbot || !user || historyLoaded) return;
+
+      const { data } = await supabase
+        .from('web_chat_messages')
+        .select('id, role, content, created_at')
+        .eq('chatbot_id', chatbot.id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      setHistoryLoaded(true);
+
+      if (data && data.length > 0) {
+        const loaded: Message[] = data.map((m) => ({
+          id: m.id,
+          role: m.role === 'assistant' ? 'bot' : 'user',
+          content: m.content,
+          timestamp: new Date(m.created_at),
+        }));
+        setMessages(loaded);
+      } else {
+        // No history → show welcome message (not saved)
+        setMessages([
+          {
+            id: 'welcome',
+            role: 'bot',
+            content: chatbot.welcome_message || 'مرحباً! كيف يمكنني مساعدتك اليوم؟',
+            timestamp: new Date(),
+          },
+        ]);
+      }
     }
-  }, [chatbot]);
+
+    loadHistory();
+  }, [chatbot, user, historyLoaded]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleClearHistory = async () => {
+    if (!chatbot || !user) return;
+    setClearing(true);
+    try {
+      await supabase
+        .from('web_chat_messages')
+        .delete()
+        .eq('chatbot_id', chatbot.id)
+        .eq('user_id', user.id);
+
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'bot',
+          content: chatbot.welcome_message || 'مرحباً! كيف يمكنني مساعدتك اليوم؟',
+          timestamp: new Date(),
+        },
+      ]);
+      toast({ title: 'تم مسح المحادثة', description: 'بدأت محادثة جديدة' });
+    } catch {
+      toast({ title: 'خطأ', description: 'تعذر مسح المحادثة', variant: 'destructive' });
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !chatbot || sending) return;
@@ -55,16 +112,12 @@ export default function TestChatPage() {
     setSending(true);
 
     try {
-      // Send conversation history (excluding welcome message)
-      const history = messages
-        .filter((_, i) => i > 0) // skip welcome
-        .map((m) => ({ role: m.role, content: m.content }));
-
       const { data, error } = await supabase.functions.invoke('chat', {
         body: {
           message: currentInput,
           chatbot_id: chatbot.id,
-          conversation_history: history,
+          user_id: user?.id,
+          conversation_history: [],
         },
       });
 
@@ -102,11 +155,29 @@ export default function TestChatPage() {
   return (
     <div className="animate-fade-in flex h-[calc(100vh-8rem)] flex-col" dir="rtl">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">تجربة الشات</h1>
-        <p className="mt-1 text-muted-foreground">
-          اختبر ردود الشات بوت بناءً على قاعدة المعرفة الفعلية
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">تجربة الشات</h1>
+          <p className="mt-1 text-muted-foreground">
+            اختبر ردود الشات بوت بناءً على قاعدة المعرفة الفعلية
+          </p>
+        </div>
+        {messages.length > 1 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClearHistory}
+            disabled={clearing}
+            className="gap-2 text-destructive hover:text-destructive"
+          >
+            {clearing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            مسح المحادثة
+          </Button>
+        )}
       </div>
 
       {/* Chat Container */}
@@ -142,6 +213,9 @@ export default function TestChatPage() {
                 )}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p className="mt-1 text-[10px] opacity-50">
+                  {message.timestamp.toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
             </div>
           ))}
