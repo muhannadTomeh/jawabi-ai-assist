@@ -22,7 +22,7 @@ import { WhatsAppConnectDialog } from '@/components/channels/WhatsAppConnectDial
 interface Channel {
   id: string;
   chatbot_id: string;
-  platform: 'telegram' | 'messenger';
+  platform: 'telegram' | 'messenger' | 'whatsapp';
   is_connected: boolean;
   config: Record<string, string> | null;
   created_at: string;
