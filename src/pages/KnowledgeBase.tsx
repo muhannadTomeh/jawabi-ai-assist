@@ -59,6 +59,7 @@ export default function KnowledgeBasePage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<KnowledgeItem | null>(null);
+  const [editItem, setEditItem] = useState<KnowledgeItem | null>(null);
   const { toast } = useToast();
 
   const fetchItems = async () => {
