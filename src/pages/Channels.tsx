@@ -41,6 +41,12 @@ const channelInfo = {
     color: 'bg-[#0084ff]/10',
     textColor: 'text-[#0084ff]',
   },
+  whatsapp: {
+    name: 'واتساب',
+    description: 'اربط واتساب بزنس للرد على رسائل العملاء تلقائياً',
+    color: 'bg-[#25D366]/10',
+    textColor: 'text-[#25D366]',
+  },
 };
 
 export default function ChannelsPage() {
