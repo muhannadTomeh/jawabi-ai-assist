@@ -10,6 +10,9 @@ interface Chatbot {
   language: string;
   tone: string;
   fallback_message: string;
+  welcome_message: string;
+  custom_instructions: string;
+  dialect: string;
   created_at: string;
   updated_at: string;
 }
