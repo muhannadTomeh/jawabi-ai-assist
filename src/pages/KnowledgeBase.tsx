@@ -214,7 +214,7 @@ export default function KnowledgeBasePage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEditItem(item)}>
                       <Edit className="ml-2 h-4 w-4" />
                       تعديل
                     </DropdownMenuItem>
