@@ -83,14 +83,14 @@ export default function SettingsPage() {
           </p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+          {saving ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Save className="me-2 h-4 w-4" />}
           حفظ التغييرات
         </Button>
       </div>
 
       {/* Settings Tabs */}
-      <Tabs defaultValue="general" className="space-y-6">
-        <TabsList>
+      <Tabs defaultValue="general" className="space-y-6" dir="rtl">
+        <TabsList className="justify-start">
           <TabsTrigger value="general" className="gap-2">
             <Bot className="h-4 w-4" />
             عام
