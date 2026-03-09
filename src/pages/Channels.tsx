@@ -143,11 +143,13 @@ export default function ChannelsPage() {
     }
   };
 
-  const handleConnect = (platform: 'telegram' | 'messenger') => {
+  const handleConnect = (platform: 'telegram' | 'messenger' | 'whatsapp') => {
     if (platform === 'telegram') {
       setTelegramDialogOpen(true);
-    } else {
+    } else if (platform === 'messenger') {
       setMessengerDialogOpen(true);
+    } else {
+      setWhatsappDialogOpen(true);
     }
   };
 
