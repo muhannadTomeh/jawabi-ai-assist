@@ -93,7 +93,7 @@ export default function ChannelsPage() {
     }
   }, [chatbot]);
 
-  const getChannel = (platform: 'telegram' | 'messenger') => {
+  const getChannel = (platform: 'telegram' | 'messenger' | 'whatsapp') => {
     return channels.find((c) => c.platform === platform);
   };
 
