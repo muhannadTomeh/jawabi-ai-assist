@@ -33,30 +33,66 @@ interface WhatsAppWebhook {
   }>;
 }
 
-function getDialectInstruction(dialect: string): string {
-  if (dialect === "palestinian") {
-    return `\n\nاللهجة: تحدث باللهجة العامية الفلسطينية. استخدم تعبيرات مثل "كيفك"، "شو"، "هلأ"، "إنشاء الله"، "يعطيك العافية" وما شابه. لا تستخدم الفصحى.`;
-  }
-  return `\n\nاللهجة: تحدث بالعربية الفصحى الرسمية.`;
+async function upsertContact(
+  supabase: ReturnType<typeof createClient>,
+  chatbotId: string,
+  phoneNumber: string,
+  name?: string
+) {
+  await supabase.from("whatsapp_contacts").upsert(
+    {
+      chatbot_id: chatbotId,
+      phone_number: phoneNumber,
+      ...(name ? { name } : {}),
+      last_message_at: new Date().toISOString(),
+    },
+    { onConflict: "chatbot_id,phone_number", ignoreDuplicates: false }
+  );
+}
+
+async function saveMessages(
+  supabase: ReturnType<typeof createClient>,
+  chatbotId: string,
+  phoneNumber: string,
+  userMessage: string,
+  botReply: string
+) {
+  await supabase.from("whatsapp_messages").insert([
+    { chatbot_id: chatbotId, phone_number: phoneNumber, role: "user", content: userMessage },
+    { chatbot_id: chatbotId, phone_number: phoneNumber, role: "assistant", content: botReply },
+  ]);
+}
+
+async function getConversationHistory(
+  supabase: ReturnType<typeof createClient>,
+  chatbotId: string,
+  phoneNumber: string,
+  limit = 10
+): Promise<{ role: string; content: string }[]> {
+  const { data } = await supabase
+    .from("whatsapp_messages")
+    .select("role, content")
+    .eq("chatbot_id", chatbotId)
+    .eq("phone_number", phoneNumber)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (!data) return [];
+  return data.reverse(); // oldest first
 }
 
 async function generateAIResponse(
   userMessage: string,
   knowledgeContext: string,
   chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string },
-  conversationHistory: { role: string; content: string }[]
+  conversationHistory: { role: string; content: string }[],
+  senderName?: string
 ): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     console.error("LOVABLE_API_KEY not configured, using fallback");
     return chatbot.fallback_message;
   }
-
-  const customInstructions = chatbot.custom_instructions
-    ? `\n\nتعليمات إضافية من المالك:\n${chatbot.custom_instructions}`
-    : "";
-
-  const dialectInstruction = getDialectInstruction(chatbot.dialect || "formal");
 
   const toneMap: Record<string, string> = {
     professional: "احترافي ومهني",
@@ -65,7 +101,20 @@ async function generateAIResponse(
     formal: "رسمي ومحترم",
   };
 
-  const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}". تتحدث ${chatbot.language} بنبرة ${toneMap[chatbot.tone] || chatbot.tone}.${dialectInstruction}${customInstructions}
+  const dialectMap: Record<string, string> = {
+    palestinian: "اللهجة الفلسطينية العامية",
+    formal: "العربية الفصحى",
+  };
+
+  const customInstructions = chatbot.custom_instructions
+    ? `\n\nتعليمات إضافية:\n${chatbot.custom_instructions}`
+    : "";
+
+  const senderInfo = senderName
+    ? `\n\nاسم المرسل الحالي: ${senderName}. يمكنك مخاطبته باسمه بشكل طبيعي.`
+    : "";
+
+  const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}". تتحدث ${chatbot.language} بنبرة ${toneMap[chatbot.tone] || chatbot.tone} وبـ${dialectMap[chatbot.dialect] || "العربية الفصحى"}.${senderInfo}${customInstructions}
 
 ${knowledgeContext ? `قاعدة المعرفة:\n${knowledgeContext}` : ""}
 
@@ -75,7 +124,7 @@ ${knowledgeContext ? `قاعدة المعرفة:\n${knowledgeContext}` : ""}
   const messages = [
     { role: "system", content: systemPrompt },
     ...conversationHistory.slice(-10).map((m) => ({
-      role: m.role === "bot" || m.role === "assistant" ? "assistant" : "user",
+      role: m.role === "bot" ? "assistant" : m.role,
       content: m.content,
     })),
     { role: "user", content: userMessage },
@@ -126,7 +175,6 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token && challenge) {
-      // Find channel with this verify token
       const { data: channel } = await supabase
         .from("channels")
         .select("*")
@@ -182,39 +230,58 @@ Deno.serve(async (req) => {
 
         if (!value.messages) continue;
 
+        // Build a map of contact names from the contacts array
+        const contactNames: Record<string, string> = {};
+        if (value.contacts) {
+          for (const c of value.contacts) {
+            contactNames[c.wa_id] = c.profile.name;
+          }
+        }
+
+        // Build knowledge context once for all messages
+        const { data: knowledgeItems } = await supabase
+          .from("knowledge_items")
+          .select("*")
+          .eq("chatbot_id", chatbot.id);
+
+        let knowledgeContext = "";
+        if (knowledgeItems && knowledgeItems.length > 0) {
+          const faqs = knowledgeItems
+            .filter((i) => i.type === "faq" && i.question && i.answer)
+            .map((i) => `سؤال: ${i.question}\nجواب: ${i.answer}`)
+            .join("\n\n");
+          const texts = knowledgeItems
+            .filter((i) => i.type === "text" && i.content)
+            .map((i) => `${i.title}: ${i.content}`)
+            .join("\n\n");
+          if (faqs) knowledgeContext += faqs + "\n\n";
+          if (texts) knowledgeContext += texts;
+        }
+
         for (const message of value.messages) {
           if (message.type !== "text" || !message.text?.body) continue;
 
           const senderPhone = message.from;
           const userMessage = message.text.body;
+          const senderName = contactNames[senderPhone];
 
-          // Build knowledge context
-          const { data: knowledgeItems } = await supabase
-            .from("knowledge_items")
-            .select("*")
-            .eq("chatbot_id", chatbot.id);
+          // Upsert contact (save/update name and last message time)
+          await upsertContact(supabase, chatbot.id, senderPhone, senderName);
 
-          let knowledgeContext = "";
-          if (knowledgeItems && knowledgeItems.length > 0) {
-            const faqs = knowledgeItems
-              .filter((i) => i.type === "faq" && i.question && i.answer)
-              .map((i) => `سؤال: ${i.question}\nجواب: ${i.answer}`)
-              .join("\n\n");
-            const texts = knowledgeItems
-              .filter((i) => i.type === "text" && i.content)
-              .map((i) => `${i.title}: ${i.content}`)
-              .join("\n\n");
-            if (faqs) knowledgeContext += faqs + "\n\n";
-            if (texts) knowledgeContext += texts;
-          }
+          // Get conversation history for this sender
+          const history = await getConversationHistory(supabase, chatbot.id, senderPhone, 10);
 
-          // Generate AI response
+          // Generate AI response with history and sender name
           const responseText = await generateAIResponse(
             userMessage,
             knowledgeContext,
             chatbot,
-            [] // No conversation history for now
+            history,
+            senderName
           );
+
+          // Save messages to database
+          await saveMessages(supabase, chatbot.id, senderPhone, userMessage, responseText);
 
           // Send response via WhatsApp Cloud API
           const waApiUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;

@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { message, chatbot_id, conversation_history } = await req.json();
+    const { message, chatbot_id, conversation_history, user_id } = await req.json();
 
     if (!message || !chatbot_id) {
       return new Response(
@@ -62,6 +62,25 @@ Deno.serve(async (req) => {
       if (textItems) knowledgeContext += `\n## معلومات إضافية:\n${textItems}`;
     }
 
+    // Fetch stored history from DB if user_id provided (for persistent memory)
+    let dbHistory: { role: string; content: string }[] = [];
+    if (user_id) {
+      const { data: storedMessages } = await supabase
+        .from("web_chat_messages")
+        .select("role, content")
+        .eq("chatbot_id", chatbot_id)
+        .eq("user_id", user_id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (storedMessages && storedMessages.length > 0) {
+        dbHistory = storedMessages.reverse();
+      }
+    }
+
+    // Merge DB history with any additional conversation_history from client
+    const mergedHistory = dbHistory.length > 0 ? dbHistory : (conversation_history || []);
+
     // Build system prompt
     const toneMap: Record<string, string> = {
       professional: "احترافي ومهني",
@@ -70,11 +89,17 @@ Deno.serve(async (req) => {
       formal: "رسمي ومحترم",
     };
 
+    const dialectMap: Record<string, string> = {
+      palestinian: "اللهجة الفلسطينية العامية",
+      formal: "العربية الفصحى",
+    };
+
     const toneDesc = toneMap[chatbot.tone] || chatbot.tone;
+    const dialectDesc = dialectMap[chatbot.dialect] || "العربية الفصحى";
 
     const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}". 
 اللغة: ${chatbot.language}
-اللهجة: ${chatbot.dialect}
+اللهجة: ${dialectDesc}
 النبرة: ${toneDesc}
 
 ${chatbot.custom_instructions ? `تعليمات خاصة: ${chatbot.custom_instructions}` : ""}
@@ -92,14 +117,12 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
       { role: "system", content: systemPrompt },
     ];
 
-    // Add conversation history
-    if (conversation_history && Array.isArray(conversation_history)) {
-      for (const msg of conversation_history) {
-        messages.push({
-          role: msg.role === "bot" ? "assistant" : "user",
-          content: msg.content,
-        });
-      }
+    // Add merged conversation history
+    for (const msg of mergedHistory) {
+      messages.push({
+        role: msg.role === "bot" ? "assistant" : msg.role === "user" ? "user" : msg.role,
+        content: msg.content,
+      });
     }
 
     // Add current message
@@ -123,7 +146,6 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
       console.error("AI API error:", errText);
-      // Fallback to chatbot's fallback message
       return new Response(
         JSON.stringify({ response: chatbot.fallback_message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -132,6 +154,14 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
 
     const aiData = await aiResponse.json();
     const reply = aiData.choices?.[0]?.message?.content || chatbot.fallback_message;
+
+    // Save user message + bot reply to DB if user_id provided
+    if (user_id) {
+      await supabase.from("web_chat_messages").insert([
+        { chatbot_id, user_id, role: "user", content: message },
+        { chatbot_id, user_id, role: "assistant", content: reply },
+      ]);
+    }
 
     return new Response(
       JSON.stringify({ response: reply }),
