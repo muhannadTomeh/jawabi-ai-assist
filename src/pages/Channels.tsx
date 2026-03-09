@@ -161,7 +161,7 @@ export default function ChannelsPage() {
     );
   }
 
-  const platforms: Array<'telegram' | 'messenger'> = ['telegram', 'messenger'];
+  const platforms: Array<'telegram' | 'messenger' | 'whatsapp'> = ['telegram', 'messenger', 'whatsapp'];
 
   return (
     <div className="animate-fade-in space-y-6">
