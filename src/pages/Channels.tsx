@@ -282,6 +282,17 @@ export default function ChannelsPage() {
         />
       )}
 
+      {/* WhatsApp Dialog */}
+      {chatbot && (
+        <WhatsAppConnectDialog
+          open={whatsappDialogOpen}
+          onOpenChange={setWhatsappDialogOpen}
+          chatbotId={chatbot.id}
+          existingChannel={getChannel('whatsapp')}
+          onSuccess={fetchChannels}
+        />
+      )}
+
       {/* Disconnect Confirmation */}
       <AlertDialog open={!!disconnectChannel} onOpenChange={() => setDisconnectChannel(null)}>
         <AlertDialogContent>
