@@ -107,7 +107,7 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
 
     // Call Lovable AI
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    const aiResponse = await fetch("https://ai.lovable.dev/api/v1/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
