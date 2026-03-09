@@ -256,7 +256,7 @@ export default function ChannelsPage() {
       <div className="card-elevated border-dashed p-6">
         <h3 className="font-semibold text-foreground">قنوات قادمة قريباً</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          واتساب، انستجرام، والمزيد من القنوات في خطة التطوير.
+          انستجرام والمزيد من القنوات في خطة التطوير.
         </p>
       </div>
 
