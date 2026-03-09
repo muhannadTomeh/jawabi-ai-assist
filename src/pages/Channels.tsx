@@ -55,6 +55,7 @@ export default function ChannelsPage() {
   const [loading, setLoading] = useState(true);
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [messengerDialogOpen, setMessengerDialogOpen] = useState(false);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
   const [disconnectChannel, setDisconnectChannel] = useState<Channel | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const { toast } = useToast();
