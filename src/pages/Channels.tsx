@@ -17,11 +17,12 @@ import { useChatbot } from '@/hooks/useChatbot';
 import { useToast } from '@/hooks/use-toast';
 import { TelegramConnectDialog } from '@/components/channels/TelegramConnectDialog';
 import { MessengerConnectDialog } from '@/components/channels/MessengerConnectDialog';
+import { WhatsAppConnectDialog } from '@/components/channels/WhatsAppConnectDialog';
 
 interface Channel {
   id: string;
   chatbot_id: string;
-  platform: 'telegram' | 'messenger';
+  platform: 'telegram' | 'messenger' | 'whatsapp';
   is_connected: boolean;
   config: Record<string, string> | null;
   created_at: string;
@@ -40,6 +41,12 @@ const channelInfo = {
     color: 'bg-[#0084ff]/10',
     textColor: 'text-[#0084ff]',
   },
+  whatsapp: {
+    name: 'واتساب',
+    description: 'اربط واتساب بزنس للرد على رسائل العملاء تلقائياً',
+    color: 'bg-[#25D366]/10',
+    textColor: 'text-[#25D366]',
+  },
 };
 
 export default function ChannelsPage() {
@@ -48,6 +55,7 @@ export default function ChannelsPage() {
   const [loading, setLoading] = useState(true);
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [messengerDialogOpen, setMessengerDialogOpen] = useState(false);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
   const [disconnectChannel, setDisconnectChannel] = useState<Channel | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const { toast } = useToast();
@@ -85,7 +93,7 @@ export default function ChannelsPage() {
     }
   }, [chatbot]);
 
-  const getChannel = (platform: 'telegram' | 'messenger') => {
+  const getChannel = (platform: 'telegram' | 'messenger' | 'whatsapp') => {
     return channels.find((c) => c.platform === platform);
   };
 
@@ -135,11 +143,13 @@ export default function ChannelsPage() {
     }
   };
 
-  const handleConnect = (platform: 'telegram' | 'messenger') => {
+  const handleConnect = (platform: 'telegram' | 'messenger' | 'whatsapp') => {
     if (platform === 'telegram') {
       setTelegramDialogOpen(true);
-    } else {
+    } else if (platform === 'messenger') {
       setMessengerDialogOpen(true);
+    } else {
+      setWhatsappDialogOpen(true);
     }
   };
 
@@ -151,7 +161,7 @@ export default function ChannelsPage() {
     );
   }
 
-  const platforms: Array<'telegram' | 'messenger'> = ['telegram', 'messenger'];
+  const platforms: Array<'telegram' | 'messenger' | 'whatsapp'> = ['telegram', 'messenger', 'whatsapp'];
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -196,9 +206,14 @@ export default function ChannelsPage() {
                       البوت: <span className="font-medium text-foreground" dir="ltr">@{channel.config.bot_username}</span>
                     </p>
                   )}
-                  {platform === 'messenger' && (channel.config.page_name || channel.config.page_id) && (
+                   {platform === 'messenger' && (channel.config.page_name || channel.config.page_id) && (
                     <p className="text-muted-foreground">
                       الصفحة: <span className="font-medium text-foreground">{channel.config.page_name || channel.config.page_id}</span>
+                    </p>
+                  )}
+                  {platform === 'whatsapp' && channel.config.display_phone && (
+                    <p className="text-muted-foreground">
+                      الرقم: <span className="font-medium text-foreground" dir="ltr">{channel.config.display_phone}</span>
                     </p>
                   )}
                 </div>
@@ -241,7 +256,7 @@ export default function ChannelsPage() {
       <div className="card-elevated border-dashed p-6">
         <h3 className="font-semibold text-foreground">قنوات قادمة قريباً</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          واتساب، انستجرام، والمزيد من القنوات في خطة التطوير.
+          انستجرام والمزيد من القنوات في خطة التطوير.
         </p>
       </div>
 
@@ -263,6 +278,17 @@ export default function ChannelsPage() {
           onOpenChange={setMessengerDialogOpen}
           chatbotId={chatbot.id}
           existingChannel={getChannel('messenger')}
+          onSuccess={fetchChannels}
+        />
+      )}
+
+      {/* WhatsApp Dialog */}
+      {chatbot && (
+        <WhatsAppConnectDialog
+          open={whatsappDialogOpen}
+          onOpenChange={setWhatsappDialogOpen}
+          chatbotId={chatbot.id}
+          existingChannel={getChannel('whatsapp')}
           onSuccess={fetchChannels}
         />
       )}

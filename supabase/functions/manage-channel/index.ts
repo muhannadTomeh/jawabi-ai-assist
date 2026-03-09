@@ -22,6 +22,8 @@ function sanitizeConfig(config: Record<string, unknown> | null): Record<string, 
   if (config.page_id) safe.page_id = String(config.page_id);
   if (config.page_name) safe.page_name = String(config.page_name);
   if (config.webhook_url) safe.webhook_url = String(config.webhook_url);
+  if (config.display_phone) safe.display_phone = String(config.display_phone);
+  if (config.phone_number_id) safe.phone_number_id = String(config.phone_number_id);
   return Object.keys(safe).length > 0 ? safe : null;
 }
 
