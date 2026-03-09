@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useChatbot } from '@/hooks/useChatbot';
 import { useToast } from '@/hooks/use-toast';
 import { AddContentDialog } from '@/components/knowledge/AddContentDialog';
+import { EditContentDialog } from '@/components/knowledge/EditContentDialog';
 import { FileUploadDialog } from '@/components/knowledge/FileUploadDialog';
 
 interface KnowledgeItem {
@@ -58,6 +59,7 @@ export default function KnowledgeBasePage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<KnowledgeItem | null>(null);
+  const [editItem, setEditItem] = useState<KnowledgeItem | null>(null);
   const { toast } = useToast();
 
   const fetchItems = async () => {
@@ -212,7 +214,7 @@ export default function KnowledgeBasePage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEditItem(item)}>
                       <Edit className="ml-2 h-4 w-4" />
                       تعديل
                     </DropdownMenuItem>
@@ -265,6 +267,14 @@ export default function KnowledgeBasePage() {
           onSuccess={fetchItems}
         />
       )}
+
+      {/* Edit Content Dialog */}
+      <EditContentDialog
+        open={!!editItem}
+        onOpenChange={(open) => !open && setEditItem(null)}
+        item={editItem}
+        onSuccess={fetchItems}
+      />
 
       {/* File Upload Dialog */}
       {chatbot && (
