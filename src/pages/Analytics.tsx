@@ -1,15 +1,99 @@
-import { BarChart3, MessageSquare, TrendingUp, Share2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BarChart3, MessageSquare, TrendingUp, Share2, Loader2, Users } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { mockAnalytics } from '@/data/mockData';
+import { useChatbot } from '@/hooks/useChatbot';
+import { supabase } from '@/integrations/supabase/client';
+
+interface AnalyticsData {
+  totalMessages: number;
+  userMessages: number;
+  botMessages: number;
+  uniqueUsers: number;
+  todayMessages: number;
+  weekMessages: number;
+}
 
 export default function AnalyticsPage() {
+  const { chatbot, loading: chatbotLoading } = useChatbot();
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [channelCount, setChannelCount] = useState(0);
+
+  useEffect(() => {
+    if (!chatbot) return;
+
+    async function fetchAnalytics() {
+      setLoading(true);
+      try {
+        // Fetch all telegram messages for this chatbot
+        const { data: messages, error: msgError } = await supabase
+          .from('telegram_messages')
+          .select('*')
+          .eq('chatbot_id', chatbot!.id);
+
+        if (msgError) throw msgError;
+
+        // Fetch connected channels
+        const { data: channels, error: chError } = await supabase
+          .from('channels')
+          .select('*')
+          .eq('chatbot_id', chatbot!.id)
+          .eq('is_connected', true);
+
+        if (chError) throw chError;
+
+        setChannelCount(channels?.length || 0);
+
+        const allMessages = messages || [];
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - 7);
+
+        const uniqueUserIds = new Set(allMessages.map((m) => m.telegram_user_id));
+
+        setAnalytics({
+          totalMessages: allMessages.length,
+          userMessages: allMessages.filter((m) => m.role === 'user').length,
+          botMessages: allMessages.filter((m) => m.role === 'bot' || m.role === 'assistant').length,
+          uniqueUsers: uniqueUserIds.size,
+          todayMessages: allMessages.filter((m) => new Date(m.created_at) >= todayStart).length,
+          weekMessages: allMessages.filter((m) => new Date(m.created_at) >= weekStart).length,
+        });
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAnalytics();
+  }, [chatbot]);
+
+  if (chatbotLoading || loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const data = analytics || {
+    totalMessages: 0,
+    userMessages: 0,
+    botMessages: 0,
+    uniqueUsers: 0,
+    todayMessages: 0,
+    weekMessages: 0,
+  };
+
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="animate-fade-in space-y-8" dir="rtl">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">الإحصائيات</h1>
         <p className="mt-1 text-muted-foreground">
-          تتبع أداء الشات بوت والتفاعل
+          تتبع أداء الشات بوت والتفاعل بناءً على البيانات الحقيقية
         </p>
       </div>
 
@@ -17,92 +101,88 @@ export default function AnalyticsPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="إجمالي الرسائل"
-          value={mockAnalytics.totalMessages.toLocaleString('ar-SA')}
+          value={data.totalMessages.toLocaleString('ar-SA')}
           icon={MessageSquare}
-          trend={{ value: 12, isPositive: true }}
         />
         <StatCard
-          title="التحويلات للدعم"
-          value={mockAnalytics.handovers}
+          title="رسائل المستخدمين"
+          value={data.userMessages.toLocaleString('ar-SA')}
           icon={TrendingUp}
-          trend={{ value: -5, isPositive: true }}
         />
         <StatCard
-          title="متوسط وقت الرد"
-          value="١.٢ ثانية"
-          icon={BarChart3}
+          title="المستخدمين الفريدين"
+          value={data.uniqueUsers.toLocaleString('ar-SA')}
+          icon={Users}
         />
         <StatCard
           title="القنوات النشطة"
-          value="٢"
+          value={channelCount.toLocaleString('ar-SA')}
           icon={Share2}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Top Questions */}
+        {/* Message Breakdown */}
         <div className="card-elevated p-6">
-          <h3 className="mb-4 font-semibold text-foreground">الأسئلة الأكثر شيوعاً</h3>
-          <div className="space-y-3">
-            {mockAnalytics.topQuestions.map((item, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                  {(index + 1).toLocaleString('ar-SA')}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                  {item.question}
-                </span>
-                <span className="shrink-0 text-sm font-medium text-muted-foreground">
-                  {item.count}
+          <h3 className="mb-4 font-semibold text-foreground">توزيع الرسائل</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">رسائل المستخدمين</span>
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${data.totalMessages > 0 ? (data.userMessages / data.totalMessages) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="w-12 text-left text-sm font-medium text-foreground">
+                  {data.userMessages}
                 </span>
               </div>
-            ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">ردود البوت</span>
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-accent transition-all"
+                    style={{
+                      width: `${data.totalMessages > 0 ? (data.botMessages / data.totalMessages) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="w-12 text-left text-sm font-medium text-foreground">
+                  {data.botMessages}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Top Topics */}
+        {/* Time-based Stats */}
         <div className="card-elevated p-6">
-          <h3 className="mb-4 font-semibold text-foreground">المواضيع الشائعة</h3>
-          <div className="space-y-3">
-            {mockAnalytics.topTopics.map((item, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-                  {item.topic}
-                </span>
-                <div className="flex items-center gap-3">
-                  <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${(item.count / mockAnalytics.topTopics[0].count) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-12 shrink-0 text-left text-sm text-muted-foreground">
-                    {item.count}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Channel Usage */}
-        <div className="card-elevated p-6 lg:col-span-2">
-          <h3 className="mb-4 font-semibold text-foreground">توزيع القنوات</h3>
-          <div className="flex flex-wrap gap-6">
-            {mockAnalytics.channelUsage.map((item, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Share2 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {item.channel === 'Telegram' ? 'تيليجرام' : 'ماسنجر'}
-                  </p>
-                  <p className="text-2xl font-semibold text-foreground">{item.count}</p>
-                  <p className="text-xs text-muted-foreground">رسالة</p>
-                </div>
-              </div>
-            ))}
+          <h3 className="mb-4 font-semibold text-foreground">النشاط الزمني</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
+              <span className="text-sm text-muted-foreground">رسائل اليوم</span>
+              <span className="text-2xl font-semibold text-foreground">
+                {data.todayMessages.toLocaleString('ar-SA')}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
+              <span className="text-sm text-muted-foreground">رسائل آخر ٧ أيام</span>
+              <span className="text-2xl font-semibold text-foreground">
+                {data.weekMessages.toLocaleString('ar-SA')}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
+              <span className="text-sm text-muted-foreground">إجمالي كل الأوقات</span>
+              <span className="text-2xl font-semibold text-foreground">
+                {data.totalMessages.toLocaleString('ar-SA')}
+              </span>
+            </div>
           </div>
         </div>
       </div>
