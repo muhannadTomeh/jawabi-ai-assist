@@ -206,9 +206,14 @@ export default function ChannelsPage() {
                       البوت: <span className="font-medium text-foreground" dir="ltr">@{channel.config.bot_username}</span>
                     </p>
                   )}
-                  {platform === 'messenger' && (channel.config.page_name || channel.config.page_id) && (
+                   {platform === 'messenger' && (channel.config.page_name || channel.config.page_id) && (
                     <p className="text-muted-foreground">
                       الصفحة: <span className="font-medium text-foreground">{channel.config.page_name || channel.config.page_id}</span>
+                    </p>
+                  )}
+                  {platform === 'whatsapp' && channel.config.display_phone && (
+                    <p className="text-muted-foreground">
+                      الرقم: <span className="font-medium text-foreground" dir="ltr">{channel.config.display_phone}</span>
                     </p>
                   )}
                 </div>
