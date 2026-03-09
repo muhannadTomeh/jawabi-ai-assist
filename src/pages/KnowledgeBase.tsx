@@ -268,6 +268,14 @@ export default function KnowledgeBasePage() {
         />
       )}
 
+      {/* Edit Content Dialog */}
+      <EditContentDialog
+        open={!!editItem}
+        onOpenChange={(open) => !open && setEditItem(null)}
+        item={editItem}
+        onSuccess={fetchItems}
+      />
+
       {/* File Upload Dialog */}
       {chatbot && (
         <FileUploadDialog
