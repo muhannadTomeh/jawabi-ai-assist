@@ -44,7 +44,20 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token && challenge) {
-      // Find channel with this verify token
+      // Check social_connections metadata for verify_token
+      const { data: socialConn } = await supabase
+        .from("social_connections")
+        .select("id")
+        .eq("platform", "facebook")
+        .filter("metadata->verify_token", "eq", token)
+        .maybeSingle();
+
+      if (socialConn) {
+        console.log("Webhook verified via social_connections:", socialConn.id);
+        return new Response(challenge, { headers: { "Content-Type": "text/plain" } });
+      }
+
+      // Fallback to legacy channels
       const { data: channel } = await supabase
         .from("channels")
         .select("*")
@@ -54,9 +67,7 @@ Deno.serve(async (req) => {
 
       if (channel) {
         console.log("Webhook verified for channel:", channel.id);
-        return new Response(challenge, {
-          headers: { "Content-Type": "text/plain" },
-        });
+        return new Response(challenge, { headers: { "Content-Type": "text/plain" } });
       }
     }
 
