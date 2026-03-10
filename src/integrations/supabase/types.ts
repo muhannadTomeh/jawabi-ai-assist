@@ -215,6 +215,56 @@ export type Database = {
         }
         Relationships: []
       }
+      social_connections: {
+        Row: {
+          access_token: string
+          chatbot_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          page_id: string
+          page_name: string | null
+          platform: string
+          token_expiry: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          chatbot_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          page_id: string
+          page_name?: string | null
+          platform: string
+          token_expiry?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          chatbot_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          page_id?: string
+          page_name?: string | null
+          platform?: string
+          token_expiry?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connections_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_messages: {
         Row: {
           chatbot_id: string

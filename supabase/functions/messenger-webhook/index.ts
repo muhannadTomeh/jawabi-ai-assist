@@ -44,7 +44,20 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token && challenge) {
-      // Find channel with this verify token
+      // Check social_connections metadata for verify_token
+      const { data: socialConn } = await supabase
+        .from("social_connections")
+        .select("id")
+        .eq("platform", "facebook")
+        .filter("metadata->verify_token", "eq", token)
+        .maybeSingle();
+
+      if (socialConn) {
+        console.log("Webhook verified via social_connections:", socialConn.id);
+        return new Response(challenge, { headers: { "Content-Type": "text/plain" } });
+      }
+
+      // Fallback to legacy channels
       const { data: channel } = await supabase
         .from("channels")
         .select("*")
@@ -54,9 +67,7 @@ Deno.serve(async (req) => {
 
       if (channel) {
         console.log("Webhook verified for channel:", channel.id);
-        return new Response(challenge, {
-          headers: { "Content-Type": "text/plain" },
-        });
+        return new Response(challenge, { headers: { "Content-Type": "text/plain" } });
       }
     }
 
@@ -77,22 +88,40 @@ Deno.serve(async (req) => {
     for (const entry of body.entry) {
       const pageId = entry.id;
 
-      // Find channel for this page
-      const { data: channel } = await supabase
-        .from("channels")
+      // Try social_connections first, fall back to channels
+      let chatbot: any = null;
+      let pageAccessToken: string | null = null;
+
+      const { data: socialConn } = await supabase
+        .from("social_connections")
         .select("*, chatbots(*)")
-        .eq("platform", "messenger")
-        .eq("is_connected", true)
-        .filter("config->page_id", "eq", pageId)
+        .eq("platform", "facebook")
+        .eq("page_id", pageId)
         .maybeSingle();
 
-      if (!channel) {
-        console.log("No channel found for page:", pageId);
-        continue;
+      if (socialConn) {
+        chatbot = socialConn.chatbots;
+        pageAccessToken = socialConn.access_token;
+      } else {
+        // Fallback to legacy channels table
+        const { data: channel } = await supabase
+          .from("channels")
+          .select("*, chatbots(*)")
+          .eq("platform", "messenger")
+          .eq("is_connected", true)
+          .filter("config->page_id", "eq", pageId)
+          .maybeSingle();
+
+        if (channel) {
+          chatbot = channel.chatbots;
+          pageAccessToken = channel.config?.page_access_token;
+        }
       }
 
-      const chatbot = channel.chatbots;
-      const pageAccessToken = channel.config?.page_access_token;
+      if (!chatbot || !pageAccessToken) {
+        console.log("No connection found for page:", pageId);
+        continue;
+      }
 
       for (const messaging of entry.messaging) {
         if (!messaging.message?.text) continue;
