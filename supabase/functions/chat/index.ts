@@ -45,6 +45,35 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("chatbot_id", chatbot_id);
 
+    // Fetch handover settings
+    const { data: handover } = await supabase
+      .from("handover_settings")
+      .select("*")
+      .eq("chatbot_id", chatbot_id)
+      .maybeSingle();
+
+    // Check keyword-based handover trigger
+    if (handover?.enabled && Array.isArray(handover.trigger_keywords)) {
+      const lower = message.toLowerCase();
+      const triggered = handover.trigger_keywords.some(
+        (kw: string) => kw && lower.includes(kw.toLowerCase())
+      );
+      if (triggered) {
+        const handoverMsg = handover.handover_message ||
+          "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
+        if (user_id) {
+          await supabase.from("web_chat_messages").insert([
+            { chatbot_id, user_id, role: "user", content: message },
+            { chatbot_id, user_id, role: "assistant", content: handoverMsg },
+          ]);
+        }
+        return new Response(
+          JSON.stringify({ response: handoverMsg, handover: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Build knowledge context
     let knowledgeContext = "";
     if (knowledgeItems && knowledgeItems.length > 0) {
