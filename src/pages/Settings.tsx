@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChatbot } from '@/hooks/useChatbot';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
@@ -32,6 +33,7 @@ export default function SettingsPage() {
   const [lowConfidence, setLowConfidence] = useState(true);
   const [keywords, setKeywords] = useState('بشري، موظف، مساعدة، دعم');
   const [handoverMessage, setHandoverMessage] = useState('');
+  const [handoverSettingsId, setHandoverSettingsId] = useState<string | null>(null);
 
   useEffect(() => {
     if (chatbot) {
@@ -42,8 +44,24 @@ export default function SettingsPage() {
       setFallbackMessage(chatbot.fallback_message);
       setWelcomeMessage((chatbot as any).welcome_message || '');
       setCustomInstructions((chatbot as any).custom_instructions || '');
+      loadHandover(chatbot.id);
     }
   }, [chatbot]);
+
+  const loadHandover = async (chatbotId: string) => {
+    const { data } = await supabase
+      .from('handover_settings')
+      .select('*')
+      .eq('chatbot_id', chatbotId)
+      .maybeSingle();
+    if (data) {
+      setHandoverSettingsId(data.id);
+      setHandoverEnabled(data.enabled);
+      setLowConfidence(data.trigger_on_low_confidence);
+      setKeywords((data.trigger_keywords || []).join('، '));
+      setHandoverMessage(data.handover_message);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -56,8 +74,38 @@ export default function SettingsPage() {
       welcome_message: welcomeMessage,
       custom_instructions: customInstructions,
     } as any);
+
+    let handoverOk = true;
+    if (chatbot) {
+      const payload = {
+        chatbot_id: chatbot.id,
+        enabled: handoverEnabled,
+        trigger_on_low_confidence: lowConfidence,
+        trigger_keywords: keywords
+          .split(/[،,]/)
+          .map((k) => k.trim())
+          .filter(Boolean),
+        handover_message: handoverMessage,
+      };
+      if (handoverSettingsId) {
+        const { error } = await supabase
+          .from('handover_settings')
+          .update(payload)
+          .eq('id', handoverSettingsId);
+        handoverOk = !error;
+      } else {
+        const { data, error } = await supabase
+          .from('handover_settings')
+          .insert(payload)
+          .select()
+          .single();
+        handoverOk = !error;
+        if (data) setHandoverSettingsId(data.id);
+      }
+    }
+
     setSaving(false);
-    if (result?.success) {
+    if (result?.success && handoverOk) {
       toast.success('تم حفظ الإعدادات بنجاح');
     } else {
       toast.error('حدث خطأ أثناء حفظ الإعدادات');
