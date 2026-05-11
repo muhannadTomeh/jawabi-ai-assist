@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       channels: {
         Row: {
+          bot_status: string
           chatbot_id: string
           config: Json | null
           created_at: string
@@ -24,6 +25,7 @@ export type Database = {
           platform: string
         }
         Insert: {
+          bot_status?: string
           chatbot_id: string
           config?: Json | null
           created_at?: string
@@ -32,6 +34,7 @@ export type Database = {
           platform: string
         }
         Update: {
+          bot_status?: string
           chatbot_id?: string
           config?: Json | null
           created_at?: string
@@ -218,6 +221,7 @@ export type Database = {
       social_connections: {
         Row: {
           access_token: string
+          bot_status: string
           chatbot_id: string
           created_at: string
           id: string
@@ -231,6 +235,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          bot_status?: string
           chatbot_id: string
           created_at?: string
           id?: string
@@ -244,6 +249,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          bot_status?: string
           chatbot_id?: string
           created_at?: string
           id?: string

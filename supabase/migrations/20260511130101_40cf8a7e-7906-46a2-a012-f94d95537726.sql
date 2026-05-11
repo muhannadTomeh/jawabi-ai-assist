@@ -1,0 +1,2 @@
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS bot_status text NOT NULL DEFAULT 'active';
+ALTER TABLE public.social_connections ADD COLUMN IF NOT EXISTS bot_status text NOT NULL DEFAULT 'active';
