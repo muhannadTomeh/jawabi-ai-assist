@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Share2, ExternalLink, Settings, Loader2, Unlink } from 'lucide-react';
+import { ExternalLink, Settings, Loader2, Unlink } from 'lucide-react';
+import { FaTelegram, FaFacebookMessenger, FaInstagram, FaWhatsapp } from 'react-icons/fa';
+import type { IconType } from 'react-icons';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import {
   AlertDialog,
@@ -27,6 +31,7 @@ interface Channel {
   is_connected: boolean;
   config: Record<string, string> | null;
   created_at: string;
+  bot_status?: string;
 }
 
 interface SocialConnection {
@@ -35,32 +40,37 @@ interface SocialConnection {
   page_id: string;
   page_name: string | null;
   created_at: string;
+  bot_status?: string;
 }
 
-const channelInfo: Record<Platform, { name: string; description: string; color: string; textColor: string }> = {
+const channelInfo: Record<Platform, { name: string; description: string; color: string; textColor: string; Icon: IconType }> = {
   telegram: {
     name: 'تيليجرام',
     description: 'اربط بوت تيليجرام للرد على الرسائل تلقائياً',
     color: 'bg-[#0088cc]/10',
     textColor: 'text-[#0088cc]',
+    Icon: FaTelegram,
   },
   facebook: {
     name: 'فيسبوك ماسنجر',
     description: 'اربط صفحة فيسبوك للرد على استفسارات العملاء عبر ماسنجر',
     color: 'bg-[#0084ff]/10',
     textColor: 'text-[#0084ff]',
+    Icon: FaFacebookMessenger,
   },
   instagram: {
     name: 'انستغرام',
     description: 'اربط حساب انستغرام بزنس للرد على الرسائل المباشرة',
     color: 'bg-[#E4405F]/10',
     textColor: 'text-[#E4405F]',
+    Icon: FaInstagram,
   },
   whatsapp: {
     name: 'واتساب',
     description: 'اربط واتساب بزنس للرد على رسائل العملاء تلقائياً',
     color: 'bg-[#25D366]/10',
     textColor: 'text-[#25D366]',
+    Icon: FaWhatsapp,
   },
 };
 
@@ -73,6 +83,7 @@ export default function ChannelsPage() {
   const [oauthPlatform, setOauthPlatform] = useState<'facebook' | 'instagram' | 'whatsapp' | null>(null);
   const [disconnectPlatform, setDisconnectPlatform] = useState<Platform | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [togglingPlatform, setTogglingPlatform] = useState<Platform | null>(null);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -101,7 +112,7 @@ export default function ChannelsPage() {
       // Fetch social connections
       const { data: connections } = await supabase
         .from('social_connections')
-        .select('id, platform, page_id, page_name, created_at')
+        .select('id, platform, page_id, page_name, created_at, bot_status')
         .eq('chatbot_id', chatbot.id);
 
       setSocialConnections(connections || []);
@@ -130,6 +141,51 @@ export default function ChannelsPage() {
     }
     const conn = socialConnections.find((c) => c.platform === platform);
     return conn?.page_name || null;
+  };
+
+  const getBotStatus = (platform: Platform): 'active' | 'inactive' => {
+    if (platform === 'telegram') {
+      const ch = channels.find((c) => c.platform === 'telegram');
+      return (ch?.bot_status as 'active' | 'inactive') || 'active';
+    }
+    const conn = socialConnections.find((c) => c.platform === platform);
+    return (conn?.bot_status as 'active' | 'inactive') || 'active';
+  };
+
+  const handleToggleBotStatus = async (platform: Platform, checked: boolean) => {
+    if (!chatbot) return;
+    const newStatus = checked ? 'active' : 'inactive';
+    setTogglingPlatform(platform);
+    try {
+      if (platform === 'telegram') {
+        const ch = channels.find((c) => c.platform === 'telegram');
+        if (!ch) throw new Error('No telegram channel');
+        const { error } = await supabase
+          .from('channels')
+          .update({ bot_status: newStatus })
+          .eq('id', ch.id);
+        if (error) throw error;
+        setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, bot_status: newStatus } : c)));
+      } else {
+        const conn = socialConnections.find((c) => c.platform === platform);
+        if (!conn) throw new Error('No connection');
+        const { error } = await supabase
+          .from('social_connections')
+          .update({ bot_status: newStatus })
+          .eq('id', conn.id);
+        if (error) throw error;
+        setSocialConnections((prev) => prev.map((c) => (c.id === conn.id ? { ...c, bot_status: newStatus } : c)));
+      }
+      toast({
+        title: checked ? 'تم تفعيل البوت' : 'تم إيقاف البوت',
+        description: `${channelInfo[platform].name}: ${checked ? 'نشط' : 'غير نشط'}`,
+      });
+    } catch (error) {
+      console.error('Toggle error:', error);
+      toast({ title: 'خطأ', description: 'تعذر تحديث حالة البوت', variant: 'destructive' });
+    } finally {
+      setTogglingPlatform(null);
+    }
   };
 
   const handleConnect = (platform: Platform) => {
@@ -226,13 +282,16 @@ export default function ChannelsPage() {
           const info = channelInfo[platform];
           const connected = isConnected(platform);
           const connInfo = getConnectionInfo(platform);
+          const botStatus = getBotStatus(platform);
+          const isToggling = togglingPlatform === platform;
+          const Icon = info.Icon;
 
           return (
             <div key={platform} className="card-elevated p-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
                   <div className={`rounded-xl p-3 ${info.color}`}>
-                    <Share2 className={`h-6 w-6 ${info.textColor}`} />
+                    <Icon className={`h-6 w-6 ${info.textColor}`} />
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">{info.name}</h3>
@@ -249,6 +308,29 @@ export default function ChannelsPage() {
                     {platform === 'telegram' ? 'البوت' : platform === 'whatsapp' ? 'الرقم' : 'الحساب'}:{' '}
                     <span className="font-medium text-foreground" dir="ltr">{connInfo}</span>
                   </p>
+                </div>
+              )}
+
+              {connected && (
+                <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`bot-status-${platform}`} className="text-sm font-medium">
+                      حالة البوت
+                    </Label>
+                    <span
+                      className={`text-xs font-medium ${
+                        botStatus === 'active' ? 'text-success' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {isToggling ? 'جارٍ التحديث...' : botStatus === 'active' ? 'نشط' : 'غير نشط'}
+                    </span>
+                  </div>
+                  <Switch
+                    id={`bot-status-${platform}`}
+                    checked={botStatus === 'active'}
+                    disabled={isToggling}
+                    onCheckedChange={(checked) => handleToggleBotStatus(platform, checked)}
+                  />
                 </div>
               )}
 
