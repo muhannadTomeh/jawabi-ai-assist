@@ -200,6 +200,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // If bot is disabled, acknowledge silently and skip processing
+    if (channel.bot_status && channel.bot_status !== "active") {
+      console.log("Telegram bot is inactive, skipping reply");
+      return new Response(JSON.stringify({ ok: true, skipped: "inactive" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const update: TelegramUpdate = await req.json();
     console.log("Received Telegram update:", JSON.stringify(update));
 
