@@ -270,9 +270,16 @@ Deno.serve(async (req) => {
           parts.push(`${item.title}:\n${item.content}`);
         } else if (item.type === "file" && item.content) {
           parts.push(`ملف "${item.title}":\n${item.content}`);
+        } else if (item.type === "image" && item.file_url) {
+          parts.push(
+            `صورة بعنوان "${item.title}":\nالوصف: ${item.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${item.file_url}]`
+          );
         }
       }
       knowledgeContext = parts.join("\n\n---\n\n");
+      if (knowledgeItems.some((i) => i.type === "image" && i.file_url)) {
+        knowledgeContext += `\n\n---\nملاحظة: عندما يطلب المستخدم رؤية صورة أو حين تكون الصورة هي أفضل إجابة، أرسلها بإضافة [IMAGE:<الرابط>] في ردك تماماً كما هو، ولا تخترع روابط.`;
+      }
     }
 
     // Generate AI response with conversation history
@@ -281,15 +288,32 @@ Deno.serve(async (req) => {
     // Save messages
     await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, responseText);
 
-    // Send response
-    const telegramResponse = await fetch(telegramApiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: responseText }),
-    });
+    // Parse [IMAGE:url] tokens and send images + remaining text
+    const imageRegex = /\[IMAGE:(https?:\/\/[^\s\]]+)\]/g;
+    const imageUrls: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = imageRegex.exec(responseText)) !== null) imageUrls.push(m[1]);
+    const cleanedText = responseText.replace(imageRegex, "").trim();
+    const sendPhotoUrl = `https://api.telegram.org/bot${botToken}/sendPhoto`;
 
-    if (!telegramResponse.ok) {
-      console.error("Telegram API error:", await telegramResponse.text());
+    for (let i = 0; i < imageUrls.length; i++) {
+      // Attach caption only to the first image if there's no remaining text segments
+      const caption = i === 0 && !cleanedText ? "" : "";
+      const r = await fetch(sendPhotoUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, photo: imageUrls[i], caption }),
+      });
+      if (!r.ok) console.error("Telegram sendPhoto error:", await r.text());
+    }
+
+    if (cleanedText) {
+      const r = await fetch(telegramApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: cleanedText }),
+      });
+      if (!r.ok) console.error("Telegram sendMessage error:", await r.text());
     }
 
     return new Response(JSON.stringify({ ok: true }), {
