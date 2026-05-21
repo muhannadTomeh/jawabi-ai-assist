@@ -1,0 +1,2 @@
+ALTER TABLE public.knowledge_items DROP CONSTRAINT IF EXISTS knowledge_items_type_check;
+ALTER TABLE public.knowledge_items ADD CONSTRAINT knowledge_items_type_check CHECK (type IN ('text','faq','file','image'));
