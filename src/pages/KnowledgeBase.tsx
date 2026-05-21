@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, FileText, MessageCircle, File, MoreHorizontal, Trash2, Edit, Upload, Loader2 } from 'lucide-react';
+import { Plus, Search, FileText, MessageCircle, File, MoreHorizontal, Trash2, Edit, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,12 +43,14 @@ const typeIcons: Record<string, typeof FileText> = {
   text: FileText,
   faq: MessageCircle,
   file: File,
+  image: ImageIcon,
 };
 
 const typeLabels: Record<string, string> = {
   text: 'محتوى نصي',
   faq: 'سؤال وجواب',
   file: 'ملف',
+  image: 'صورة',
 };
 
 export default function KnowledgeBasePage() {
@@ -97,14 +99,18 @@ export default function KnowledgeBasePage() {
     if (!deleteItem) return;
 
     try {
-      // If it's a file, delete from storage first
-      if (deleteItem.type === 'file' && deleteItem.file_url) {
-        const { error: storageError } = await supabase.storage
-          .from('knowledge-files')
-          .remove([deleteItem.file_url]);
-
-        if (storageError) {
-          console.error('Error deleting file from storage:', storageError);
+      // If it's a file/image, delete from storage first
+      if (deleteItem.file_url) {
+        if (deleteItem.type === 'file') {
+          await supabase.storage.from('knowledge-files').remove([deleteItem.file_url]);
+        } else if (deleteItem.type === 'image') {
+          // file_url for images is a public URL; extract path after the bucket name
+          const marker = '/knowledge-images/';
+          const idx = deleteItem.file_url.indexOf(marker);
+          if (idx >= 0) {
+            const path = deleteItem.file_url.substring(idx + marker.length);
+            await supabase.storage.from('knowledge-images').remove([path]);
+          }
         }
       }
 

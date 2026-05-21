@@ -254,8 +254,18 @@ Deno.serve(async (req) => {
             .filter((i) => i.type === "text" && i.content)
             .map((i) => `${i.title}: ${i.content}`)
             .join("\n\n");
+          const images = knowledgeItems
+            .filter((i) => i.type === "image" && i.file_url)
+            .map(
+              (i) =>
+                `صورة بعنوان "${i.title}":\nالوصف: ${i.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${i.file_url}]`
+            )
+            .join("\n\n");
           if (faqs) knowledgeContext += faqs + "\n\n";
           if (texts) knowledgeContext += texts;
+          if (images) {
+            knowledgeContext += `\n\n## الصور المتاحة:\n${images}\n\nعندما يطلب المستخدم رؤية صورة أو حين تكون الصورة هي أفضل إجابة، أرسلها بإضافة [IMAGE:<الرابط>] في ردك تماماً كما هي، ولا تخترع روابط.`;
+          }
         }
 
         for (const message of value.messages) {
@@ -283,25 +293,46 @@ Deno.serve(async (req) => {
           // Save messages to database
           await saveMessages(supabase, chatbot.id, senderPhone, userMessage, responseText);
 
-          // Send response via WhatsApp Cloud API
+          // Parse [IMAGE:url] tokens and send images + remaining text
+          const imageRegex = /\[IMAGE:(https?:\/\/[^\s\]]+)\]/g;
+          const imageUrls: string[] = [];
+          let m: RegExpExecArray | null;
+          while ((m = imageRegex.exec(responseText)) !== null) imageUrls.push(m[1]);
+          const cleanedText = responseText.replace(imageRegex, "").trim();
           const waApiUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
-          const waResponse = await fetch(waApiUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({
-              messaging_product: "whatsapp",
-              to: senderPhone,
-              type: "text",
-              text: { body: responseText },
-            }),
-          });
 
-          if (!waResponse.ok) {
-            const errorData = await waResponse.text();
-            console.error("WhatsApp API error:", errorData);
+          for (const imgUrl of imageUrls) {
+            const r = await fetch(waApiUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: senderPhone,
+                type: "image",
+                image: { link: imgUrl },
+              }),
+            });
+            if (!r.ok) console.error("WhatsApp image send error:", await r.text());
+          }
+
+          if (cleanedText) {
+            const r = await fetch(waApiUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: senderPhone,
+                type: "text",
+                text: { body: cleanedText },
+              }),
+            });
+            if (!r.ok) console.error("WhatsApp text send error:", await r.text());
           }
         }
       }

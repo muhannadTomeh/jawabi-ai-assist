@@ -87,8 +87,19 @@ Deno.serve(async (req) => {
         .map((item) => `${item.title}: ${item.content}`)
         .join("\n\n");
 
+      const imageItems = knowledgeItems
+        .filter((item) => item.type === "image" && item.file_url)
+        .map(
+          (item) =>
+            `صورة بعنوان "${item.title}":\nالوصف: ${item.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${item.file_url}]`
+        )
+        .join("\n\n");
+
       if (faqItems) knowledgeContext += `\n## الأسئلة الشائعة:\n${faqItems}`;
       if (textItems) knowledgeContext += `\n## معلومات إضافية:\n${textItems}`;
+      if (imageItems) {
+        knowledgeContext += `\n## الصور المتاحة:\n${imageItems}\n\nملاحظة: عندما يطلب المستخدم رؤية صورة أو حين تكون الصورة هي أفضل إجابة (قائمة أسعار، كتالوج، خريطة...)، أرسلها بإضافة [IMAGE:<الرابط>] في ردك تماماً كما هي. يمكنك إرسال أكثر من صورة. لا تخترع روابط ولا تستخدم سوى الروابط الموجودة أعلاه.`;
+      }
     }
 
     // Fetch stored history from DB if user_id provided (for persistent memory)

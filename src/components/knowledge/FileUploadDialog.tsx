@@ -8,7 +8,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, File, X, Loader2, CheckCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Upload, File, X, Loader2, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -19,13 +20,15 @@ interface FileUploadDialogProps {
   onSuccess: () => void;
 }
 
-const ALLOWED_TYPES = [
+const DOC_TYPES = [
   'application/pdf',
   'text/plain',
   'text/markdown',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_TYPES = [...DOC_TYPES, ...IMAGE_TYPES];
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -37,7 +40,9 @@ export function FileUploadDialog({
 }: FileUploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -45,7 +50,9 @@ export function FileUploadDialog({
   const resetForm = () => {
     setFile(null);
     setTitle('');
+    setDescription('');
     setUploading(false);
+    setAnalyzing(false);
   };
 
   const handleClose = () => {
@@ -55,7 +62,7 @@ export function FileUploadDialog({
 
   const validateFile = (file: File): string | null => {
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return 'نوع الملف غير مدعوم. الأنواع المدعومة: PDF, TXT, DOC, DOCX';
+      return 'نوع الملف غير مدعوم. الأنواع المدعومة: PDF, TXT, DOC, DOCX, JPG, PNG, WEBP, GIF';
     }
     if (file.size > MAX_SIZE) {
       return 'حجم الملف يتجاوز الحد الأقصى (10 ميجابايت)';
@@ -103,36 +110,55 @@ export function FileUploadDialog({
     setUploading(true);
 
     try {
-      // Generate unique file path
+      const isImage = IMAGE_TYPES.includes(file.type);
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${chatbotId}/${fileName}`;
+      const bucket = isImage ? 'knowledge-images' : 'knowledge-files';
 
-      // Upload file to storage
       const { error: uploadError } = await supabase.storage
-        .from('knowledge-files')
+        .from(bucket)
         .upload(filePath, file);
-
       if (uploadError) throw uploadError;
 
-      // Get file URL
-      const { data: urlData } = supabase.storage
-        .from('knowledge-files')
-        .getPublicUrl(filePath);
+      let storedUrl = filePath;
+      let analyzedDescription = '';
 
-      // Create knowledge item record
+      if (isImage) {
+        const { data: urlData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(filePath);
+        storedUrl = urlData.publicUrl;
+
+        setAnalyzing(true);
+        try {
+          const { data: analyzeData } = await supabase.functions.invoke('analyze-image', {
+            body: { image_url: storedUrl, title: title.trim() },
+          });
+          analyzedDescription = analyzeData?.description || '';
+        } catch (e) {
+          console.error('analyze-image failed:', e);
+        } finally {
+          setAnalyzing(false);
+        }
+      }
+
+      const combinedContent = isImage
+        ? [description.trim(), analyzedDescription].filter(Boolean).join('\n\n---\nتحليل تلقائي للصورة:\n')
+        : null;
+
       const { error: dbError } = await supabase.from('knowledge_items').insert({
         chatbot_id: chatbotId,
-        type: 'file',
+        type: isImage ? 'image' : 'file',
         title: title.trim(),
         file_name: file.name,
-        file_url: filePath, // Store path, not public URL since bucket is private
+        file_url: storedUrl,
+        content: combinedContent,
       });
-
       if (dbError) throw dbError;
 
       toast({
-        title: 'تم رفع الملف بنجاح',
+        title: isImage ? 'تم رفع الصورة وتحليلها' : 'تم رفع الملف بنجاح',
         description: `تم إضافة "${title}" إلى قاعدة المعرفة`,
       });
 
@@ -147,11 +173,15 @@ export function FileUploadDialog({
       });
     } finally {
       setUploading(false);
+      setAnalyzing(false);
     }
   };
 
   const getFileIcon = () => {
     if (!file) return null;
+    if (IMAGE_TYPES.includes(file.type)) {
+      return <ImageIcon className="h-8 w-8 text-primary" />;
+    }
     return <File className="h-8 w-8 text-primary" />;
   };
 
@@ -186,13 +216,13 @@ export function FileUploadDialog({
                 اسحب الملف هنا أو اضغط للاختيار
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                PDF, TXT, DOC, DOCX - حتى 10 ميجابايت
+                PDF, TXT, DOC, DOCX, JPG, PNG, WEBP, GIF - حتى 10 ميجابايت
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.txt,.md,.doc,.docx"
+                accept=".pdf,.txt,.md,.doc,.docx,.jpg,.jpeg,.png,.webp,.gif"
                 onChange={(e) => {
                   const selected = e.target.files?.[0];
                   if (selected) handleFileSelect(selected);
@@ -200,36 +230,62 @@ export function FileUploadDialog({
               />
             </div>
           ) : (
-            <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
-              {getFileIcon()}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{file.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(file.size)}
-                </p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
+                {getFileIcon()}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatFileSize(file.size)}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setFile(null)}
+                  disabled={uploading}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setFile(null)}
-                disabled={uploading}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {IMAGE_TYPES.includes(file.type) && (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt="معاينة"
+                  className="max-h-48 w-full rounded-lg object-contain border bg-muted/30"
+                />
+              )}
             </div>
           )}
 
           {/* Title Input */}
           <div className="space-y-2">
-            <Label htmlFor="title">عنوان الملف</Label>
+            <Label htmlFor="title">العنوان</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="أدخل عنوان للملف..."
+              placeholder="مثال: قائمة الأسعار، كتالوج المنتج..."
               disabled={uploading}
             />
           </div>
+
+          {file && IMAGE_TYPES.includes(file.type) && (
+            <div className="space-y-2">
+              <Label htmlFor="description">وصف الصورة (اختياري)</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="متى ترسل هذه الصورة للزبون؟ ماذا تحتوي؟ سيتم تحليلها تلقائياً أيضاً."
+                rows={3}
+                disabled={uploading}
+              />
+              <p className="text-xs text-muted-foreground">
+                سيقوم الذكاء الاصطناعي بقراءة الصورة واستخراج محتواها تلقائياً، وسيرسلها للزبون عند الحاجة.
+              </p>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-2">
@@ -238,7 +294,12 @@ export function FileUploadDialog({
               disabled={!file || !title.trim() || uploading}
               className="flex-1"
             >
-              {uploading ? (
+              {analyzing ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جاري تحليل الصورة...
+                </>
+              ) : uploading ? (
                 <>
                   <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                   جاري الرفع...
@@ -246,7 +307,7 @@ export function FileUploadDialog({
               ) : (
                 <>
                   <CheckCircle className="ml-2 h-4 w-4" />
-                  رفع الملف
+                  رفع
                 </>
               )}
             </Button>

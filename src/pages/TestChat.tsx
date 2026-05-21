@@ -15,6 +15,46 @@ interface Message {
   timestamp: Date;
 }
 
+const IMAGE_TOKEN_RE = /\[IMAGE:(https?:\/\/[^\s\]]+)\]/g;
+
+function MessageContent({ content }: { content: string }) {
+  const parts: Array<{ type: 'text' | 'image'; value: string }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  IMAGE_TOKEN_RE.lastIndex = 0;
+  while ((match = IMAGE_TOKEN_RE.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: content.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'image', value: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < content.length) {
+    parts.push({ type: 'text', value: content.slice(lastIndex) });
+  }
+  if (parts.length === 0) parts.push({ type: 'text', value: content });
+
+  return (
+    <div className="space-y-2">
+      {parts.map((p, i) =>
+        p.type === 'image' ? (
+          <a key={i} href={p.value} target="_blank" rel="noreferrer">
+            <img
+              src={p.value}
+              alt="مرفق"
+              className="max-h-64 w-full rounded-lg object-contain bg-background/40"
+            />
+          </a>
+        ) : p.value.trim() ? (
+          <p key={i} className="text-sm whitespace-pre-wrap">
+            {p.value.trim()}
+          </p>
+        ) : null
+      )}
+    </div>
+  );
+}
+
 export default function TestChatPage() {
   const { chatbot, loading: chatbotLoading } = useChatbot();
   const { user } = useAuth();
@@ -212,7 +252,7 @@ export default function TestChatPage() {
                     : 'bg-primary text-primary-foreground'
                 )}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <MessageContent content={message.content} />
                 <p className="mt-1 text-[10px] opacity-50">
                   {message.timestamp.toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
                 </p>
