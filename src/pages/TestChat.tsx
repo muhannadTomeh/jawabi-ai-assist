@@ -212,7 +212,7 @@ export default function TestChatPage() {
                     : 'bg-primary text-primary-foreground'
                 )}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <MessageContent content={message.content} />
                 <p className="mt-1 text-[10px] opacity-50">
                   {message.timestamp.toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })}
                 </p>
