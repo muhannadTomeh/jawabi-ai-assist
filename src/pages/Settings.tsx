@@ -309,6 +309,49 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="failedThreshold">عدد الرسائل غير المفهومة قبل التحويل</Label>
+                <Input
+                  id="failedThreshold"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={failedThreshold}
+                  onChange={(e) => setFailedThreshold(Number(e.target.value) || 3)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  إذا فشل البوت في فهم الزبون هذا العدد من المرات المتتالية، يتم تحويله لموظف.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">التحويل عند نية الشراء</p>
+                    <p className="text-sm text-muted-foreground">
+                      تحويل الزبون لموظف مبيعات عند اكتشاف نية إجراء عملية شراء حقيقية
+                    </p>
+                  </div>
+                  <Switch checked={triggerOnSale} onCheckedChange={setTriggerOnSale} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="saleMsg">
+                    {triggerOnSale ? 'رسالة التحويل للمبيعات' : 'الرسالة البديلة عند نية الشراء'}
+                  </Label>
+                  <Textarea
+                    id="saleMsg"
+                    value={saleMessage}
+                    onChange={(e) => setSaleMessage(e.target.value)}
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {triggerOnSale
+                      ? 'تُرسل عند تحويل الزبون لموظف المبيعات.'
+                      : 'عند تعطيل التحويل، تُرسل هذه الرسالة بدلاً منه (مثل: رابط المتجر أو رقم التواصل).'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="handoverMsg">رسالة التحويل</Label>
                 <Textarea
                   id="handoverMsg"
