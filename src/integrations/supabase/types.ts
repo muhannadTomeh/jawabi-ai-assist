@@ -106,8 +106,10 @@ export type Database = {
           handover_message: string
           id: string
           low_confidence_threshold: number
+          sale_message: string
           trigger_keywords: string[]
           trigger_on_low_confidence: boolean
+          trigger_on_sale: boolean
           updated_at: string
         }
         Insert: {
@@ -118,8 +120,10 @@ export type Database = {
           handover_message?: string
           id?: string
           low_confidence_threshold?: number
+          sale_message?: string
           trigger_keywords?: string[]
           trigger_on_low_confidence?: boolean
+          trigger_on_sale?: boolean
           updated_at?: string
         }
         Update: {
@@ -130,8 +134,10 @@ export type Database = {
           handover_message?: string
           id?: string
           low_confidence_threshold?: number
+          sale_message?: string
           trigger_keywords?: string[]
           trigger_on_low_confidence?: boolean
+          trigger_on_sale?: boolean
           updated_at?: string
         }
         Relationships: [
