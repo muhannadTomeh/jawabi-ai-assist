@@ -197,6 +197,51 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          channel: string
+          chatbot_id: string
+          contact_identifier: string
+          contact_name: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          is_resolved: boolean
+          last_message: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          chatbot_id: string
+          contact_identifier: string
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          is_resolved?: boolean
+          last_message?: string | null
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          chatbot_id?: string
+          contact_identifier?: string
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          is_resolved?: boolean
+          last_message?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

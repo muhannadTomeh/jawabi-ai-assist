@@ -254,6 +254,92 @@ Deno.serve(async (req) => {
     // Get conversation history
     const conversationHistory = await getConversationHistory(supabase, telegramUserId, chatbot.id);
 
+    // Fetch handover settings
+    const { data: handover } = await supabase
+      .from("handover_settings")
+      .select("*")
+      .eq("chatbot_id", chatbot.id)
+      .maybeSingle();
+
+    // Helper to create a notification
+    const createNotification = async (type: string, title: string) => {
+      await supabase.from("notifications").insert({
+        chatbot_id: chatbot.id,
+        type,
+        title,
+        channel: "telegram",
+        contact_identifier: String(telegramUserId),
+        contact_name: firstName || username || null,
+        last_message: userMessage,
+      });
+    };
+
+    // Keyword-based handover
+    if (handover?.enabled && Array.isArray(handover.trigger_keywords)) {
+      const lower = userMessage.toLowerCase();
+      const triggered = handover.trigger_keywords.some(
+        (kw: string) => kw && lower.includes(kw.toLowerCase())
+      );
+      if (triggered) {
+        const handoverMsg = handover.handover_message ||
+          "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
+        await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, handoverMsg);
+        await createNotification("human_request", "طلب التحدث مع موظف");
+        await fetch(telegramApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: handoverMsg }),
+        });
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Sale-intent detection
+    if (handover?.enabled) {
+      try {
+        const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+        const intentRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableApiKey}` },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              {
+                role: "system",
+                content:
+                  'صنّف الرسالة. أجب فقط بكلمة واحدة: "sale" إذا كان الزبون يريد إجراء عملية شراء حقيقية الآن (تأكيد طلب، دفع، شراء منتج محدد)، أو "no" في غير ذلك.',
+              },
+              { role: "user", content: userMessage },
+            ],
+            max_tokens: 5,
+          }),
+        });
+        if (intentRes.ok) {
+          const intentData = await intentRes.json();
+          const intent = (intentData.choices?.[0]?.message?.content || "").toLowerCase().trim();
+          if (intent.includes("sale")) {
+            const saleMsg = handover.sale_message || "سأقوم بتحويلك إلى موظف المبيعات.";
+            await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, saleMsg);
+            if (handover.trigger_on_sale === true) {
+              await createNotification("sale", "طلب شراء");
+            }
+            await fetch(telegramApiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: chatId, text: saleMsg }),
+            });
+            return new Response(JSON.stringify({ ok: true }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Sale intent failed:", e);
+      }
+    }
+
     // Build knowledge context
     const { data: knowledgeItems } = await supabase
       .from("knowledge_items")
@@ -283,7 +369,26 @@ Deno.serve(async (req) => {
     }
 
     // Generate AI response with conversation history
-    const responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
+    let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
+
+    // Unclear-question handover (consecutive fallback responses)
+    if (handover?.enabled && responseText.trim() === chatbot.fallback_message.trim()) {
+      const threshold = handover.failed_responses_threshold || 3;
+      const { data: lastAssistant } = await supabase
+        .from("telegram_messages")
+        .select("content")
+        .eq("chatbot_id", chatbot.id)
+        .eq("telegram_user_id", telegramUserId)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(threshold - 1);
+      const fails =
+        (lastAssistant || []).filter((m) => m.content.trim() === chatbot.fallback_message.trim()).length + 1;
+      if (fails >= threshold) {
+        responseText = handover.handover_message || "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
+        await createNotification("unclear", "سؤال غير مفهوم");
+      }
+    }
 
     // Save messages
     await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, responseText);
