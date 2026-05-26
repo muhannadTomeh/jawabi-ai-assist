@@ -9,10 +9,12 @@ import {
   LogOut,
   User,
   ShieldCheck,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminCheck } from '@/hooks/useAdminCheck';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const navigation = [
   { name: 'لوحة التحكم', href: '/dashboard', icon: Bot },
@@ -20,6 +22,7 @@ const navigation = [
   { name: 'القنوات', href: '/dashboard/channels', icon: Share2 },
   { name: 'الإحصائيات', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'تجربة الشات', href: '/dashboard/test', icon: MessageSquare },
+  { name: 'الإشعارات', href: '/dashboard/notifications', icon: Bell },
   { name: 'الإعدادات', href: '/dashboard/settings', icon: Settings },
 ];
 
@@ -27,6 +30,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdminCheck();
+  const { unreadCount } = useNotifications();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -65,7 +69,12 @@ export function AppSidebar() {
                 )}
               >
                 <item.icon className="h-5 w-5" />
-                <span>{item.name}</span>
+                <span className="flex-1">{item.name}</span>
+                {item.href === '/dashboard/notifications' && unreadCount > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
