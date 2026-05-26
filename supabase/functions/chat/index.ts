@@ -67,6 +67,14 @@ Deno.serve(async (req) => {
             { chatbot_id, user_id, role: "assistant", content: handoverMsg },
           ]);
         }
+        await supabase.from("notifications").insert({
+          chatbot_id,
+          type: "human_request",
+          title: "طلب التحدث مع موظف",
+          channel: "web",
+          contact_identifier: user_id || "anonymous",
+          last_message: message,
+        });
         return new Response(
           JSON.stringify({ response: handoverMsg, handover: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -104,6 +112,16 @@ Deno.serve(async (req) => {
                 { chatbot_id, user_id, role: "user", content: message },
                 { chatbot_id, user_id, role: "assistant", content: saleMsg },
               ]);
+            }
+            if (handover.trigger_on_sale === true) {
+              await supabase.from("notifications").insert({
+                chatbot_id,
+                type: "sale",
+                title: "طلب شراء",
+                channel: "web",
+                contact_identifier: user_id || "anonymous",
+                last_message: message,
+              });
             }
             return new Response(
               JSON.stringify({ response: saleMsg, handover: handover.trigger_on_sale === true }),
@@ -255,6 +273,14 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
       if (consecutiveFails >= threshold) {
         finalReply = handover.handover_message || "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
         didHandover = true;
+        await supabase.from("notifications").insert({
+          chatbot_id,
+          type: "unclear",
+          title: "سؤال غير مفهوم",
+          channel: "web",
+          contact_identifier: user_id,
+          last_message: message,
+        });
       }
     }
 
