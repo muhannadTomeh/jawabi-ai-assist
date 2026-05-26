@@ -74,6 +74,48 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Detect sale intent via AI classifier
+    if (handover?.enabled) {
+      try {
+        const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+        const intentRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableApiKey}` },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              {
+                role: "system",
+                content:
+                  'صنّف الرسالة التالية. أجب فقط بكلمة واحدة: "sale" إذا كان الزبون يريد إجراء عملية شراء حقيقية الآن (تأكيد طلب، دفع، شراء منتج محدد بنية واضحة)، أو "no" في غير ذلك (سؤال عن السعر، استفسار عام، تصفح).',
+              },
+              { role: "user", content: message },
+            ],
+            max_tokens: 5,
+          }),
+        });
+        if (intentRes.ok) {
+          const intentData = await intentRes.json();
+          const intent = (intentData.choices?.[0]?.message?.content || "").toLowerCase().trim();
+          if (intent.includes("sale")) {
+            const saleMsg = handover.sale_message || "سأقوم بتحويلك إلى موظف المبيعات.";
+            if (user_id) {
+              await supabase.from("web_chat_messages").insert([
+                { chatbot_id, user_id, role: "user", content: message },
+                { chatbot_id, user_id, role: "assistant", content: saleMsg },
+              ]);
+            }
+            return new Response(
+              JSON.stringify({ response: saleMsg, handover: handover.trigger_on_sale === true }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+      } catch (e) {
+        console.error("Sale intent detection failed:", e);
+      }
+    }
+
     // Build knowledge context
     let knowledgeContext = "";
     if (knowledgeItems && knowledgeItems.length > 0) {
@@ -195,16 +237,37 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
     const aiData = await aiResponse.json();
     const reply = aiData.choices?.[0]?.message?.content || chatbot.fallback_message;
 
+    // Failed-responses handover: if reply is the fallback message, count consecutive failures
+    let finalReply = reply;
+    let didHandover = false;
+    if (handover?.enabled && user_id && reply.trim() === chatbot.fallback_message.trim()) {
+      const threshold = handover.failed_responses_threshold || 3;
+      const { data: lastAssistant } = await supabase
+        .from("web_chat_messages")
+        .select("content")
+        .eq("chatbot_id", chatbot_id)
+        .eq("user_id", user_id)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(threshold - 1);
+      const consecutiveFails =
+        (lastAssistant || []).filter((m) => m.content.trim() === chatbot.fallback_message.trim()).length + 1;
+      if (consecutiveFails >= threshold) {
+        finalReply = handover.handover_message || "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
+        didHandover = true;
+      }
+    }
+
     // Save user message + bot reply to DB if user_id provided
     if (user_id) {
       await supabase.from("web_chat_messages").insert([
         { chatbot_id, user_id, role: "user", content: message },
-        { chatbot_id, user_id, role: "assistant", content: reply },
+        { chatbot_id, user_id, role: "assistant", content: finalReply },
       ]);
     }
 
     return new Response(
-      JSON.stringify({ response: reply }),
+      JSON.stringify({ response: finalReply, handover: didHandover }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
