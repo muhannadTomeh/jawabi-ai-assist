@@ -33,6 +33,9 @@ export default function SettingsPage() {
   const [lowConfidence, setLowConfidence] = useState(true);
   const [keywords, setKeywords] = useState('بشري، موظف، مساعدة، دعم');
   const [handoverMessage, setHandoverMessage] = useState('');
+  const [failedThreshold, setFailedThreshold] = useState(3);
+  const [triggerOnSale, setTriggerOnSale] = useState(false);
+  const [saleMessage, setSaleMessage] = useState('سأقوم بتحويلك إلى أحد موظفي المبيعات لإتمام طلبك.');
   const [handoverSettingsId, setHandoverSettingsId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,6 +63,9 @@ export default function SettingsPage() {
       setLowConfidence(data.trigger_on_low_confidence);
       setKeywords((data.trigger_keywords || []).join('، '));
       setHandoverMessage(data.handover_message);
+      setFailedThreshold(data.failed_responses_threshold ?? 3);
+      setTriggerOnSale((data as any).trigger_on_sale ?? false);
+      setSaleMessage((data as any).sale_message ?? 'سأقوم بتحويلك إلى أحد موظفي المبيعات لإتمام طلبك.');
     }
   };
 
@@ -86,7 +92,10 @@ export default function SettingsPage() {
           .map((k) => k.trim())
           .filter(Boolean),
         handover_message: handoverMessage,
-      };
+        failed_responses_threshold: failedThreshold,
+        trigger_on_sale: triggerOnSale,
+        sale_message: saleMessage,
+      } as any;
       if (handoverSettingsId) {
         const { error } = await supabase
           .from('handover_settings')
