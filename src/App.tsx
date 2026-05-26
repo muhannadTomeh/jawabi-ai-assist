@@ -13,6 +13,7 @@ import AnalyticsPage from "@/pages/Analytics";
 import TestChatPage from "@/pages/TestChat";
 import SettingsPage from "@/pages/Settings";
 import AdminPage from "@/pages/Admin";
+import NotificationsPage from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/dashboard/channels" element={<ChannelsPage />} />
               <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
               <Route path="/dashboard/test" element={<TestChatPage />} />
+              <Route path="/dashboard/notifications" element={<NotificationsPage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
               <Route path="/dashboard/admin" element={<AdminPage />} />
             </Route>
