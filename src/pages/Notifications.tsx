@@ -54,7 +54,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">الإشعارات</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -62,7 +62,7 @@ export default function NotificationsPage() {
           </p>
         </div>
         {unreadCount > 0 && (
-          <Button variant="outline" onClick={markAllRead}>
+          <Button variant="outline" size="sm" onClick={markAllRead} className="shrink-0">
             <Check className="ml-2 h-4 w-4" />
             تعليم الكل كمقروء ({unreadCount})
           </Button>
