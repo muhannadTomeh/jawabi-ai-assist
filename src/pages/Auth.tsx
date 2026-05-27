@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { lovable } from '@/integrations/lovable';
 
 export default function AuthPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
