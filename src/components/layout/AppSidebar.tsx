@@ -15,6 +15,9 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminCheck } from '@/hooks/useAdminCheck';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Menu } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const navigation = [
   { name: 'لوحة التحكم', href: '/dashboard', icon: Bot },
@@ -26,7 +29,7 @@ const navigation = [
   { name: 'الإعدادات', href: '/dashboard/settings', icon: Settings },
 ];
 
-export function AppSidebar() {
+function SidebarInner({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdminCheck();
@@ -44,8 +47,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed right-0 top-0 z-40 h-screen w-64 border-l border-sidebar-border bg-sidebar">
-      <div className="flex h-full flex-col">
+    <div className="flex h-full w-full flex-col bg-sidebar">
         {/* Logo */}
         <div className="flex h-16 items-center border-b border-sidebar-border px-6">
           <Link to="/dashboard" className="flex items-center gap-2">
@@ -63,6 +65,7 @@ export function AppSidebar() {
               <Link
                 key={item.name}
                 to={item.href}
+                onClick={onNavigate}
                 className={cn(
                   'nav-item',
                   active ? 'nav-item-active' : 'nav-item-inactive'
@@ -83,6 +86,7 @@ export function AppSidebar() {
           {isAdmin && (
             <Link
               to="/dashboard/admin"
+              onClick={onNavigate}
               className={cn(
                 'nav-item mt-4 border-t border-sidebar-border pt-4',
                 isActive('/dashboard/admin') ? 'nav-item-active' : 'nav-item-inactive'
@@ -117,7 +121,43 @@ export function AppSidebar() {
             </button>
           </div>
         </div>
-      </div>
+    </div>
+  );
+}
+
+export function AppSidebar() {
+  return (
+    <aside className="fixed right-0 top-0 z-40 hidden h-screen w-64 border-l border-sidebar-border bg-sidebar lg:block">
+      <SidebarInner />
     </aside>
+  );
+}
+
+export function MobileSidebar() {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const { unreadCount } = useNotifications();
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-background text-foreground"
+          aria-label="القائمة"
+        >
+          <Menu className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-72 p-0">
+        <SidebarInner onNavigate={() => setOpen(false)} />
+      </SheetContent>
+    </Sheet>
   );
 }
