@@ -585,6 +585,18 @@ export type Database = {
         Returns: boolean
       }
       is_chatbot_owner: { Args: { chatbot_id: string }; Returns: boolean }
+      record_customer_contact: {
+        Args: {
+          _channel: string
+          _chatbot_id: string
+          _external_id: string
+          _last_message?: string
+          _name?: string
+          _phone?: string
+          _username?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "user" | "admin"
