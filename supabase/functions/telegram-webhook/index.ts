@@ -228,6 +228,17 @@ Deno.serve(async (req) => {
     // Register user (track new vs existing)
     const { isNew } = await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
 
+    // Record/Upsert customer profile (dedup per chatbot+channel+external_id)
+    await supabase.rpc("record_customer_contact", {
+      _chatbot_id: chatbot.id,
+      _channel: "telegram",
+      _external_id: String(telegramUserId),
+      _name: firstName || null,
+      _username: username || null,
+      _phone: null,
+      _last_message: userMessage,
+    });
+
     // Handle /start command - always send welcome
     if (userMessage === "/start") {
       const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;

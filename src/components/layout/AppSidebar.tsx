@@ -10,6 +10,7 @@ import {
   User,
   ShieldCheck,
   Bell,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'لوحة التحكم', href: '/dashboard', icon: Bot },
   { name: 'قاعدة المعرفة', href: '/dashboard/knowledge', icon: BookOpen },
   { name: 'القنوات', href: '/dashboard/channels', icon: Share2 },
+  { name: 'العملاء', href: '/dashboard/customers', icon: Users },
   { name: 'الإحصائيات', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'تجربة الشات', href: '/dashboard/test', icon: MessageSquare },
   { name: 'الإشعارات', href: '/dashboard/notifications', icon: Bell },

@@ -129,6 +129,17 @@ Deno.serve(async (req) => {
         const senderId = messaging.sender.id;
         const userMessage = messaging.message.text;
 
+        // Record customer profile
+        await supabase.rpc("record_customer_contact", {
+          _chatbot_id: chatbot.id,
+          _channel: "facebook",
+          _external_id: senderId,
+          _name: null,
+          _username: null,
+          _phone: null,
+          _last_message: userMessage,
+        });
+
         // Generate response
         let responseText = chatbot.fallback_message;
 

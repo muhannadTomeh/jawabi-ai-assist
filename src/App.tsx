@@ -14,6 +14,7 @@ import TestChatPage from "@/pages/TestChat";
 import SettingsPage from "@/pages/Settings";
 import AdminPage from "@/pages/Admin";
 import NotificationsPage from "@/pages/Notifications";
+import CustomersPage from "@/pages/Customers";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/knowledge" element={<KnowledgeBasePage />} />
               <Route path="/dashboard/channels" element={<ChannelsPage />} />
+              <Route path="/dashboard/customers" element={<CustomersPage />} />
               <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
               <Route path="/dashboard/test" element={<TestChatPage />} />
               <Route path="/dashboard/notifications" element={<NotificationsPage />} />

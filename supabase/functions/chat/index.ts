@@ -25,6 +25,19 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Record customer profile for web channel (if identifiable)
+    if (user_id) {
+      await supabase.rpc("record_customer_contact", {
+        _chatbot_id: chatbot_id,
+        _channel: "web",
+        _external_id: user_id,
+        _name: null,
+        _username: null,
+        _phone: null,
+        _last_message: message,
+      });
+    }
+
     // Fetch chatbot settings
     const { data: chatbot, error: chatbotError } = await supabase
       .from("chatbots")
