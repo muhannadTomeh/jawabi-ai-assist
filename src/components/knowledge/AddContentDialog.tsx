@@ -269,6 +269,48 @@ export function AddContentDialog({
               )}
             </Button>
           </TabsContent>
+
+          <TabsContent value="url" className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="url-value">رابط الموقع أو الملف</Label>
+              <Input
+                id="url-value"
+                type="url"
+                dir="ltr"
+                value={urlValue}
+                onChange={(e) => setUrlValue(e.target.value)}
+                placeholder="https://example.com/about أو رابط Google Drive/Docs"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                يدعم صفحات الويب العامة، روابط Google Docs، وملفات Google Drive (يجب أن تكون قابلة للوصول للجميع).
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="url-title">العنوان (اختياري)</Label>
+              <Input
+                id="url-title"
+                value={urlTitle}
+                onChange={(e) => setUrlTitle(e.target.value)}
+                placeholder="مثال: صفحة من نحن"
+                disabled={loading}
+              />
+            </div>
+            <Button
+              onClick={handleSubmitUrl}
+              disabled={!urlValue.trim() || loading}
+              className="w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جاري جلب المحتوى...
+                </>
+              ) : (
+                'جلب وإضافة المحتوى'
+              )}
+            </Button>
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
