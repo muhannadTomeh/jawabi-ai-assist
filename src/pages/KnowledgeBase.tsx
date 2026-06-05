@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, FileText, MessageCircle, File, MoreHorizontal, Trash2, Edit, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, FileText, MessageCircle, File, MoreHorizontal, Trash2, Edit, Upload, Loader2, Image as ImageIcon, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -44,6 +44,7 @@ const typeIcons: Record<string, typeof FileText> = {
   faq: MessageCircle,
   file: File,
   image: ImageIcon,
+  url: Globe,
 };
 
 const typeLabels: Record<string, string> = {
@@ -51,6 +52,7 @@ const typeLabels: Record<string, string> = {
   faq: 'سؤال وجواب',
   file: 'ملف',
   image: 'صورة',
+  url: 'رابط ويب',
 };
 
 export default function KnowledgeBasePage() {
