@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, MessageCircle, Loader2 } from 'lucide-react';
+import { FileText, MessageCircle, Loader2, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,12 +40,18 @@ export function AddContentDialog({
   const [faqQuestion, setFaqQuestion] = useState('');
   const [faqAnswer, setFaqAnswer] = useState('');
 
+  // URL state
+  const [urlTitle, setUrlTitle] = useState('');
+  const [urlValue, setUrlValue] = useState('');
+
   const resetForm = () => {
     setTextTitle('');
     setTextContent('');
     setFaqTitle('');
     setFaqQuestion('');
     setFaqAnswer('');
+    setUrlTitle('');
+    setUrlValue('');
     setActiveTab('text');
   };
 
@@ -121,6 +127,35 @@ export function AddContentDialog({
     }
   };
 
+  const handleSubmitUrl = async () => {
+    const trimmed = urlValue.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-url-content', {
+        body: { url: trimmed, chatbot_id: chatbotId, title: urlTitle.trim() || undefined },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: 'تمت الإضافة بنجاح',
+        description: `تم استخراج المحتوى من "${data?.title || trimmed}"`,
+      });
+      onSuccess();
+      handleClose();
+    } catch (error: any) {
+      console.error('Error fetching URL:', error);
+      toast({
+        title: 'خطأ',
+        description: error?.message || 'تعذر استخراج المحتوى من الرابط',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg">
@@ -129,7 +164,7 @@ export function AddContentDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="text" className="gap-2">
               <FileText className="h-4 w-4" />
               محتوى نصي
@@ -137,6 +172,10 @@ export function AddContentDialog({
             <TabsTrigger value="faq" className="gap-2">
               <MessageCircle className="h-4 w-4" />
               سؤال وجواب
+            </TabsTrigger>
+            <TabsTrigger value="url" className="gap-2">
+              <Globe className="h-4 w-4" />
+              رابط ويب
             </TabsTrigger>
           </TabsList>
 
@@ -227,6 +266,48 @@ export function AddContentDialog({
                 </>
               ) : (
                 'إضافة السؤال'
+              )}
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="url" className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="url-value">رابط الموقع أو الملف</Label>
+              <Input
+                id="url-value"
+                type="url"
+                dir="ltr"
+                value={urlValue}
+                onChange={(e) => setUrlValue(e.target.value)}
+                placeholder="https://example.com/about أو رابط Google Drive/Docs"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                يدعم صفحات الويب العامة، روابط Google Docs، وملفات Google Drive (يجب أن تكون قابلة للوصول للجميع).
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="url-title">العنوان (اختياري)</Label>
+              <Input
+                id="url-title"
+                value={urlTitle}
+                onChange={(e) => setUrlTitle(e.target.value)}
+                placeholder="مثال: صفحة من نحن"
+                disabled={loading}
+              />
+            </div>
+            <Button
+              onClick={handleSubmitUrl}
+              disabled={!urlValue.trim() || loading}
+              className="w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جاري جلب المحتوى...
+                </>
+              ) : (
+                'جلب وإضافة المحتوى'
               )}
             </Button>
           </TabsContent>
