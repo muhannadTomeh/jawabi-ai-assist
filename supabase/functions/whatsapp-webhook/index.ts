@@ -278,6 +278,17 @@ Deno.serve(async (req) => {
           // Upsert contact (save/update name and last message time)
           await upsertContact(supabase, chatbot.id, senderPhone, senderName);
 
+          // Record customer profile
+          await supabase.rpc("record_customer_contact", {
+            _chatbot_id: chatbot.id,
+            _channel: "whatsapp",
+            _external_id: senderPhone,
+            _name: senderName || null,
+            _username: null,
+            _phone: senderPhone,
+            _last_message: userMessage,
+          });
+
           // Get conversation history for this sender
           const history = await getConversationHistory(supabase, chatbot.id, senderPhone, 10);
 

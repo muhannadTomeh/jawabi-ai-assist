@@ -97,6 +97,60 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          channel: string
+          chatbot_id: string
+          created_at: string
+          external_id: string
+          first_seen_at: string
+          id: string
+          last_message: string | null
+          last_seen_at: string
+          message_count: number
+          name: string | null
+          notes: string | null
+          phone: string | null
+          tag: Database["public"]["Enums"]["customer_tag"]
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          channel: string
+          chatbot_id: string
+          created_at?: string
+          external_id: string
+          first_seen_at?: string
+          id?: string
+          last_message?: string | null
+          last_seen_at?: string
+          message_count?: number
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          tag?: Database["public"]["Enums"]["customer_tag"]
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          channel?: string
+          chatbot_id?: string
+          created_at?: string
+          external_id?: string
+          first_seen_at?: string
+          id?: string
+          last_message?: string | null
+          last_seen_at?: string
+          message_count?: number
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          tag?: Database["public"]["Enums"]["customer_tag"]
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       handover_settings: {
         Row: {
           chatbot_id: string
@@ -531,9 +585,22 @@ export type Database = {
         Returns: boolean
       }
       is_chatbot_owner: { Args: { chatbot_id: string }; Returns: boolean }
+      record_customer_contact: {
+        Args: {
+          _channel: string
+          _chatbot_id: string
+          _external_id: string
+          _last_message?: string
+          _name?: string
+          _phone?: string
+          _username?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "user" | "admin"
+      customer_tag: "new" | "prospect" | "regular" | "vip" | "blocked"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -662,6 +729,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user", "admin"],
+      customer_tag: ["new", "prospect", "regular", "vip", "blocked"],
     },
   },
 } as const
