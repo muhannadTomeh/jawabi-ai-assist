@@ -79,14 +79,17 @@ async function fetchInstagramAccount(igId: string, token: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Require service role bearer
-  const auth = req.headers.get("Authorization") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  if (auth !== `Bearer ${serviceKey}`) {
+  // Require shared cron secret (stored in cron.job, readable only by superuser).
+  const CRON_SECRET = "f702663e446c2280ab61fd575d52527ad5c71eede6424f7f9113236e6b21c256";
+  const provided = req.headers.get("x-cron-secret") ?? "";
+  if (provided !== CRON_SECRET) {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
 
   // Find distinct source_refs with auto_sync=true
   const { data: refs, error } = await admin
