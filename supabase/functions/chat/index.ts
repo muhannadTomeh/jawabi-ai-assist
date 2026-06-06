@@ -156,8 +156,8 @@ Deno.serve(async (req) => {
         .join("\n\n");
 
       const textItems = knowledgeItems
-        .filter((item) => (item.type === "text" || item.type === "url") && item.content)
-        .map((item) => item.type === "url"
+        .filter((item) => (item.type === "text" || item.type === "url" || item.type === "social") && item.content)
+        .map((item) => (item.type === "url" || item.type === "social") && item.file_url
           ? `${item.title} (المصدر: ${item.file_url}):\n${item.content}`
           : `${item.title}: ${item.content}`)
         .join("\n\n");
