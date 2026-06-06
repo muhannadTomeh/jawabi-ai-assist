@@ -249,6 +249,15 @@ export default function KnowledgeBasePage() {
                       <Edit className="ml-2 h-4 w-4" />
                       تعديل
                     </DropdownMenuItem>
+                    {item.type === 'social' && item.source_ref && (
+                      <DropdownMenuItem
+                        onClick={() => handleSyncSocial(item)}
+                        disabled={syncingId === item.id}
+                      >
+                        <RefreshCw className={`ml-2 h-4 w-4 ${syncingId === item.id ? 'animate-spin' : ''}`} />
+                        مزامنة الآن
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
