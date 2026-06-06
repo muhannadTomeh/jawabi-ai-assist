@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, FileText, MessageCircle, File, MoreHorizontal, Trash2, Edit, Upload, Loader2, Image as ImageIcon, Globe } from 'lucide-react';
+import { Plus, Search, FileText, MessageCircle, File, MoreHorizontal, Trash2, Edit, Upload, Loader2, Image as ImageIcon, Globe, Share2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -37,6 +37,8 @@ interface KnowledgeItem {
   file_name: string | null;
   file_url: string | null;
   created_at: string;
+  source_ref?: string | null;
+  auto_sync?: boolean | null;
 }
 
 const typeIcons: Record<string, typeof FileText> = {
@@ -45,6 +47,7 @@ const typeIcons: Record<string, typeof FileText> = {
   file: File,
   image: ImageIcon,
   url: Globe,
+  social: Share2,
 };
 
 const typeLabels: Record<string, string> = {
@@ -53,6 +56,7 @@ const typeLabels: Record<string, string> = {
   file: 'ملف',
   image: 'صورة',
   url: 'رابط ويب',
+  social: 'صفحة سوشيال',
 };
 
 export default function KnowledgeBasePage() {
@@ -65,6 +69,25 @@ export default function KnowledgeBasePage() {
   const [deleteItem, setDeleteItem] = useState<KnowledgeItem | null>(null);
   const [editItem, setEditItem] = useState<KnowledgeItem | null>(null);
   const { toast } = useToast();
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleSyncSocial = async (item: KnowledgeItem) => {
+    if (!item.source_ref) return;
+    setSyncingId(item.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-social-content', {
+        body: { connection_id: item.source_ref, auto_sync: !!item.auto_sync },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'تمت المزامنة', description: `تم تحديث ${data?.inserted || 0} عنصر` });
+      await fetchItems();
+    } catch (e: any) {
+      toast({ title: 'خطأ', description: e?.message || 'فشلت المزامنة', variant: 'destructive' });
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const fetchItems = async () => {
     if (!chatbot) return;
@@ -226,6 +249,15 @@ export default function KnowledgeBasePage() {
                       <Edit className="ml-2 h-4 w-4" />
                       تعديل
                     </DropdownMenuItem>
+                    {item.type === 'social' && item.source_ref && (
+                      <DropdownMenuItem
+                        onClick={() => handleSyncSocial(item)}
+                        disabled={syncingId === item.id}
+                      >
+                        <RefreshCw className={`ml-2 h-4 w-4 ${syncingId === item.id ? 'animate-spin' : ''}`} />
+                        مزامنة الآن
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"

@@ -207,37 +207,46 @@ export type Database = {
       knowledge_items: {
         Row: {
           answer: string | null
+          auto_sync: boolean
           chatbot_id: string
           content: string | null
           created_at: string
           file_name: string | null
           file_url: string | null
           id: string
+          last_synced_at: string | null
           question: string | null
+          source_ref: string | null
           title: string
           type: string
         }
         Insert: {
           answer?: string | null
+          auto_sync?: boolean
           chatbot_id: string
           content?: string | null
           created_at?: string
           file_name?: string | null
           file_url?: string | null
           id?: string
+          last_synced_at?: string | null
           question?: string | null
+          source_ref?: string | null
           title: string
           type: string
         }
         Update: {
           answer?: string | null
+          auto_sync?: boolean
           chatbot_id?: string
           content?: string | null
           created_at?: string
           file_name?: string | null
           file_url?: string | null
           id?: string
+          last_synced_at?: string | null
           question?: string | null
+          source_ref?: string | null
           title?: string
           type?: string
         }
