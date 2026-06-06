@@ -364,6 +364,73 @@ export function AddContentDialog({
               )}
             </Button>
           </TabsContent>
+
+          <TabsContent value="social" className="space-y-4 mt-4">
+            {socialConnections.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center">
+                <Share2 className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-3 text-sm text-muted-foreground">
+                  لا توجد صفحات فيسبوك أو إنستغرام مربوطة بعد.
+                </p>
+                <Button asChild variant="outline" className="mt-4">
+                  <RouterLink to="/dashboard/channels">ربط صفحة الآن</RouterLink>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>اختر الصفحة المربوطة</Label>
+                  <Select value={selectedConnection} onValueChange={setSelectedConnection} disabled={loading}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر صفحة..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {socialConnections.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <span className="flex items-center gap-2">
+                            {c.platform === 'facebook' ? (
+                              <Facebook className="h-4 w-4" />
+                            ) : (
+                              <Instagram className="h-4 w-4" />
+                            )}
+                            {c.page_name || c.platform}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    سيقوم البوت بجلب معلومات الصفحة وآخر 25 منشوراً والتعلم منها.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border p-3">
+                  <Checkbox
+                    id="auto-sync"
+                    checked={autoSync}
+                    onCheckedChange={(v) => setAutoSync(v === true)}
+                    disabled={loading}
+                  />
+                  <Label htmlFor="auto-sync" className="cursor-pointer text-sm">
+                    تحديث تلقائي يومياً لجلب أحدث المنشورات
+                  </Label>
+                </div>
+                <Button
+                  onClick={handleSubmitSocial}
+                  disabled={!selectedConnection || loading}
+                  className="w-full"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      جاري جلب المحتوى...
+                    </>
+                  ) : (
+                    'جلب محتوى الصفحة'
+                  )}
+                </Button>
+              </>
+            )}
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
