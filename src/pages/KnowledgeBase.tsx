@@ -69,6 +69,25 @@ export default function KnowledgeBasePage() {
   const [deleteItem, setDeleteItem] = useState<KnowledgeItem | null>(null);
   const [editItem, setEditItem] = useState<KnowledgeItem | null>(null);
   const { toast } = useToast();
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleSyncSocial = async (item: KnowledgeItem) => {
+    if (!item.source_ref) return;
+    setSyncingId(item.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-social-content', {
+        body: { connection_id: item.source_ref, auto_sync: !!item.auto_sync },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'تمت المزامنة', description: `تم تحديث ${data?.inserted || 0} عنصر` });
+      await fetchItems();
+    } catch (e: any) {
+      toast({ title: 'خطأ', description: e?.message || 'فشلت المزامنة', variant: 'destructive' });
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const fetchItems = async () => {
     if (!chatbot) return;
