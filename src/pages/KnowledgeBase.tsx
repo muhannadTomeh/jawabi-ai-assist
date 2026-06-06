@@ -37,6 +37,8 @@ interface KnowledgeItem {
   file_name: string | null;
   file_url: string | null;
   created_at: string;
+  source_ref?: string | null;
+  auto_sync?: boolean | null;
 }
 
 const typeIcons: Record<string, typeof FileText> = {
