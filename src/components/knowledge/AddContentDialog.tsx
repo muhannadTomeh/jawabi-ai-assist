@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, MessageCircle, Loader2, Globe } from 'lucide-react';
+import { FileText, MessageCircle, Loader2, Globe, Share2, Facebook, Instagram } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Link as RouterLink } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -44,6 +47,23 @@ export function AddContentDialog({
   const [urlTitle, setUrlTitle] = useState('');
   const [urlValue, setUrlValue] = useState('');
 
+  // Social state
+  const [socialConnections, setSocialConnections] = useState<Array<{ id: string; platform: string; page_name: string | null }>>([]);
+  const [selectedConnection, setSelectedConnection] = useState<string>('');
+  const [autoSync, setAutoSync] = useState(true);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data } = await supabase
+        .from('social_connections')
+        .select('id, platform, page_name')
+        .eq('chatbot_id', chatbotId)
+        .in('platform', ['facebook', 'instagram']);
+      setSocialConnections(data || []);
+    })();
+  }, [open, chatbotId]);
+
   const resetForm = () => {
     setTextTitle('');
     setTextContent('');
@@ -52,6 +72,8 @@ export function AddContentDialog({
     setFaqAnswer('');
     setUrlTitle('');
     setUrlValue('');
+    setSelectedConnection('');
+    setAutoSync(true);
     setActiveTab('text');
   };
 
@@ -156,6 +178,33 @@ export function AddContentDialog({
     }
   };
 
+  const handleSubmitSocial = async () => {
+    if (!selectedConnection) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-social-content', {
+        body: { connection_id: selectedConnection, auto_sync: autoSync },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: 'تمت الإضافة بنجاح',
+        description: `تم جلب ${data?.inserted || 0} عنصر من الصفحة`,
+      });
+      onSuccess();
+      handleClose();
+    } catch (error: any) {
+      console.error('Social fetch error:', error);
+      toast({
+        title: 'خطأ',
+        description: error?.message || 'تعذر جلب محتوى الصفحة',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg">
@@ -164,18 +213,22 @@ export function AddContentDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="text" className="gap-2">
               <FileText className="h-4 w-4" />
-              محتوى نصي
+              نصي
             </TabsTrigger>
             <TabsTrigger value="faq" className="gap-2">
               <MessageCircle className="h-4 w-4" />
-              سؤال وجواب
+              س/ج
             </TabsTrigger>
             <TabsTrigger value="url" className="gap-2">
               <Globe className="h-4 w-4" />
-              رابط ويب
+              رابط
+            </TabsTrigger>
+            <TabsTrigger value="social" className="gap-2">
+              <Share2 className="h-4 w-4" />
+              سوشيال
             </TabsTrigger>
           </TabsList>
 
