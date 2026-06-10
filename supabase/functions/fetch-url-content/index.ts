@@ -105,7 +105,13 @@ Deno.serve(async (req) => {
     let resp: Response;
     try {
       resp = await fetch(fetchUrl, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; JawabiBot/1.0)" },
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "ar,en;q=0.9",
+        },
         signal: controller.signal,
         redirect: "follow",
       });
@@ -118,7 +124,10 @@ Deno.serve(async (req) => {
     clearTimeout(t);
 
     if (!resp.ok) {
-      return new Response(JSON.stringify({ error: `استجابة الخادم: ${resp.status}` }), {
+      const hint = resp.status === 403 || resp.status === 401
+        ? " — قد يكون الموقع يمنع الجلب الآلي. جرّب رابطاً مختلفاً أو رابط Google Docs/Drive."
+        : "";
+      return new Response(JSON.stringify({ error: `استجابة الخادم: ${resp.status}${hint}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
