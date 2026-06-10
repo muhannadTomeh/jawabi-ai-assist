@@ -1,0 +1,2 @@
+ALTER TABLE public.knowledge_items DROP CONSTRAINT knowledge_items_type_check;
+ALTER TABLE public.knowledge_items ADD CONSTRAINT knowledge_items_type_check CHECK (type = ANY (ARRAY['text'::text, 'faq'::text, 'file'::text, 'image'::text, 'url'::text, 'social'::text]));
