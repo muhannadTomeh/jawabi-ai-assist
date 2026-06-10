@@ -81,12 +81,16 @@ export function ChatbotsList() {
 
   const toggleChatbotStatus = async (chatbot: Chatbot) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('chatbots')
         .update({ is_active: !chatbot.is_active })
-        .eq('id', chatbot.id);
+        .eq('id', chatbot.id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('لم يتم تحديث أي صف. تحقق من صلاحيات الأدمن (RLS).');
+      }
 
       setChatbots(prev =>
         prev.map(c =>
@@ -98,11 +102,11 @@ export function ChatbotsList() {
         title: chatbot.is_active ? 'تم إيقاف الشات بوت' : 'تم تفعيل الشات بوت',
         description: `${chatbot.name} ${chatbot.is_active ? 'متوقف الآن' : 'نشط الآن'}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling chatbot:', error);
       toast({
         title: 'خطأ',
-        description: 'حدث خطأ أثناء تحديث حالة الشات بوت',
+        description: error?.message || 'حدث خطأ أثناء تحديث حالة الشات بوت',
         variant: 'destructive',
       });
     }
@@ -110,12 +114,16 @@ export function ChatbotsList() {
 
   const deleteChatbot = async (chatbot: Chatbot) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('chatbots')
         .delete()
-        .eq('id', chatbot.id);
+        .eq('id', chatbot.id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('لم يتم حذف الشات بوت. تحقق من صلاحيات الأدمن (RLS).');
+      }
 
       setChatbots(prev => prev.filter(c => c.id !== chatbot.id));
 
@@ -123,11 +131,11 @@ export function ChatbotsList() {
         title: 'تم الحذف',
         description: `تم حذف الشات بوت "${chatbot.name}" بنجاح`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting chatbot:', error);
       toast({
         title: 'خطأ',
-        description: 'حدث خطأ أثناء حذف الشات بوت',
+        description: error?.message || 'حدث خطأ أثناء حذف الشات بوت',
         variant: 'destructive',
       });
     }
