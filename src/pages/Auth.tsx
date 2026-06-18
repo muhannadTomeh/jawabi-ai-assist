@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles, MessageSquare, Bot, Globe, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { lovable } from '@/integrations/lovable';
 
 export default function AuthPage() {
@@ -126,16 +126,82 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-foreground">جوابي</h1>
-          <p className="mt-2 text-muted-foreground">منصة الشات بوت الذكي للأعمال</p>
+    <div dir="rtl" className="grid min-h-screen lg:grid-cols-2">
+      {/* Brand side */}
+      <div
+        className="relative hidden flex-col justify-between overflow-hidden p-12 text-primary-foreground lg:flex"
+        style={{ background: "var(--gradient-primary)" }}
+      >
+        <div
+          aria-hidden
+          className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/10 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="absolute -bottom-40 -left-20 h-[28rem] w-[28rem] rounded-full bg-white/10 blur-3xl"
+        />
+
+        <Link to="/" className="relative z-10 inline-flex items-center gap-2 text-lg font-semibold">
+          <ArrowLeft className="h-4 w-4" />
+          العودة للرئيسية
+        </Link>
+
+        <div className="relative z-10 max-w-md">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs backdrop-blur">
+            <Sparkles className="h-3.5 w-3.5" />
+            منصة جوابي
+          </div>
+          <h2 className="text-4xl font-bold leading-tight">
+            بوت ذكي يخدم عملاءك<br />على مدار الساعة
+          </h2>
+          <p className="mt-4 text-base opacity-90">
+            انضم لمئات الأعمال التي تستخدم جوابي لأتمتة خدمة العملاء وزيادة المبيعات.
+          </p>
+
+          <ul className="mt-8 space-y-3 text-sm">
+            {[
+              { icon: Bot, text: "بوت يتحدث العربية وجميع اللهجات" },
+              { icon: MessageSquare, text: "ربط مع واتساب، تيليجرام، فيسبوك وانستجرام" },
+              { icon: Globe, text: "قاعدة معرفة قابلة للتدريب من أي مصدر" },
+              { icon: CheckCircle2, text: "إعداد فوري بدون أي خبرة تقنية" },
+            ].map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="opacity-95">{text}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Auth Card */}
-        <div className="card-elevated p-6">
+        <div className="relative z-10 text-xs opacity-80">
+          © {new Date().getFullYear()} جوابي — جميع الحقوق محفوظة
+        </div>
+      </div>
+
+      {/* Form side */}
+      <div className="relative flex items-center justify-center bg-background p-6 sm:p-10">
+        <Link
+          to="/"
+          className="absolute top-6 right-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground lg:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          الرئيسية
+        </Link>
+
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center lg:text-right">
+            <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md lg:hidden">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">مرحباً بك 👋</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              سجّل دخولك أو أنشئ حساباً جديداً وابدأ تجربتك المجانية.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           {/* Social auth buttons */}
           <div className="space-y-3 mb-6">
             <Button
@@ -277,6 +343,7 @@ export default function AuthPage() {
               </form>
             </TabsContent>
           </Tabs>
+        </div>
         </div>
       </div>
     </div>
