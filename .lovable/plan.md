@@ -1,53 +1,114 @@
+# تقرير حالة منصة Jawabi - وصف العمل والتقدم في التطوير
 
-# جلب محتوى فيسبوك/إنستغرام إلى قاعدة المعرفة
+منصة **Jawabi** هي نظام SaaS عربي (RTL) لإنشاء وإدارة بوتات محادثة ذكية مدعومة بالذكاء الاصطناعي، مع ربطها بقنوات التواصل الاجتماعي وقاعدة معرفة قابلة للتدريب.
 
-## الفكرة
-في تبويب "رابط ويب" داخل نافذة إضافة محتوى، نضيف تبويب جديد "صفحة سوشيال" يسمح للمستخدم باختيار صفحة من **الصفحات المربوطة مسبقاً** (الموجودة في `social_connections`) وجلب محتواها رسمياً عبر **Meta Graph API** باستخدام `access_token` المخزّن في القاعدة. لا scraping ولا روابط عامة — فقط الصفحات التي ربطها المستخدم في صفحة "القنوات".
+---
 
-## ما يُجلب
-لكل صفحة مربوطة:
-1. **معلومات الصفحة**: `about`, `bio`, `description`, `category`, `hours`, `phone`, `emails`, `website`, `location`.
-2. **آخر المنشورات** (نصوص فقط): آخر 25 منشوراً من `/posts` (Facebook) أو `/media` مع `caption` (Instagram).
-3. **المنتجات/الأسعار**: إن وجد كتالوج عبر `/product_catalogs` (اختياري — يُتجاهل إن لم تتوفر صلاحية).
+## 1) الميزات الأساسية والوظائف
 
-كل عنصر يُحفظ كسجل مستقل في `knowledge_items` بنوع `social` وعنوان واضح مثل "صفحة فيسبوك — معلومات" أو "إنستغرام — منشور 2026-05-12".
+### أ. المصادقة وإدارة المستخدمين
+- تسجيل دخول / إنشاء حساب عبر البريد الإلكتروني (Lovable Cloud Auth).
+- نظام أدوار (admin / user) عبر جدول `user_roles` ودالة `has_role` آمنة.
+- لوحة تحكم خاصة بالأدمن (`/admin`) لإدارة جميع المستخدمين والبوتات.
 
-## التحديث الدوري
-- إضافة عمود `auto_sync` (boolean) و `last_synced_at` (timestamptz) و `source_ref` (text — يحمل `social_connections.id` للإشارة) إلى `knowledge_items`.
-- جدولة **pg_cron** يومياً يستدعي Edge Function `sync-social-knowledge` التي:
-  - تمر على كل `social_connections` المرتبط بسجلات `knowledge_items` ذات `auto_sync=true`.
-  - تحذف السجلات القديمة من نوع `social` لتلك الصفحة وتعيد إنشاءها بأحدث محتوى.
-- زر يدوي "مزامنة الآن" في الواجهة بجانب كل عنصر `social`.
+### ب. لوحة التحكم (Dashboard)
+- إحصائيات عامة: عدد المحادثات، الرسائل، العملاء، نسبة الردود الناجحة.
+- ترحيب مخصص للمستخدمين الجدد مقابل العائدين.
 
-## التغييرات المطلوبة
+### ج. إعداد البوت (Chatbot Configuration)
+- شخصية البوت (Persona)، اللهجة، رسالة الترحيب، تعليمات مخصصة.
+- تفعيل/إيقاف البوت (للمستخدم وللأدمن).
 
-### 1. قاعدة البيانات (migration)
-- `ALTER TABLE knowledge_items ADD COLUMN auto_sync boolean DEFAULT false, ADD COLUMN last_synced_at timestamptz, ADD COLUMN source_ref text;`
-- تفعيل `pg_cron` و `pg_net` وجدولة مهمة يومية تستدعي الـ Edge Function.
+### د. قاعدة المعرفة (Knowledge Base) - RAG
+- إضافة محتوى من عدة مصادر:
+  - نص حر
+  - أسئلة وأجوبة (FAQ)
+  - ملفات (حتى 10MB)
+  - صور (تحليل عبر AI)
+  - روابط URL (استخراج محتوى الصفحة)
+  - **سوشيال**: صفحات Facebook / Instagram عبر Graph API
+- مزامنة تلقائية يومية للمحتوى الاجتماعي (cron job 3 صباحاً).
+- مزامنة يدوية ("مزامنة الآن") لكل عنصر.
 
-### 2. Edge Function جديدة: `supabase/functions/fetch-social-content/index.ts`
-- تستقبل: `{ connection_id, auto_sync?: boolean }`.
-- تتحقق من JWT المستخدم + ملكية `social_connections` و `chatbot`.
-- تستدعي Graph API حسب `platform`:
-  - **facebook**: `GET /{page_id}?fields=about,bio,description,category,hours,phone,emails,website,location` و `GET /{page_id}/posts?fields=message,created_time&limit=25`.
-  - **instagram**: `GET /{ig_user_id}?fields=biography,website,username` و `GET /{ig_user_id}/media?fields=caption,permalink,timestamp&limit=25`.
-- تنسّق كل قطعة وتحفظها في `knowledge_items` مع `type='social'`, `source_ref=connection_id`, `auto_sync`.
+### هـ. القنوات (Channels)
+- ربط: Telegram, Facebook Messenger, Instagram, WhatsApp.
+- Webhooks مستقلة لكل قناة.
+- ربط Facebook عبر OAuth.
 
-### 3. Edge Function جديدة: `supabase/functions/sync-social-knowledge/index.ts`
-- نقطة دخول للـ cron (بدون JWT — تتحقق من header سري `CRON_SECRET`).
-- تجلب كل `source_ref` فريد له `auto_sync=true` ثم تستدعي منطق `fetch-social-content` لكل واحد.
+### و. محرك المحادثة (Chat Engine)
+- Lovable AI Gateway باستخدام `google/gemini-2.5-flash`.
+- RAG: استرجاع أفضل عناصر المعرفة قبل توليد الرد.
+- ذاكرة محادثة قصيرة المدى عبر القنوات.
+- التسليم البشري (Human Handover) عند انخفاض الثقة أو كلمات مفتاحية.
 
-### 4. تحديث الواجهة
-- `src/components/knowledge/AddContentDialog.tsx`: تبويب رابع "صفحات السوشيال" يعرض `<Select>` بالصفحات المربوطة من `social_connections` (مع شارة المنصة)، خانة `Checkbox` "تحديث تلقائي يومياً"، وزر "جلب المحتوى". إن لم توجد صفحات مربوطة → رسالة + رابط لصفحة القنوات.
-- `src/pages/KnowledgeBase.tsx`: إضافة `social` إلى `typeIcons` (أيقونة Facebook/Instagram من lucide) و `typeLabels`، وزر "🔄 مزامنة" في قائمة العنصر يستدعي `fetch-social-content` بنفس `source_ref`.
+### ز. العملاء (Customers)
+- إنشاء ملف عميل تلقائياً عند أول تواصل (بدون تكرار).
+- حفظ الاسم / اسم المستخدم / الرقم / القناة.
+- فرز وتصنيف العملاء لمساعدة صاحب العمل.
 
-### 5. ملاحظات تقنية
-- صلاحيات Graph API المطلوبة: `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `instagram_basic`, `instagram_manage_insights`. يجب التأكد أن `facebook-oauth` يطلبها أصلاً؛ إن كانت ناقصة سننبّه المستخدم لإعادة الربط.
-- لا حاجة لأي API key جديد — `access_token` لكل صفحة موجود في `social_connections.access_token`.
-- نص المنشورات يُمرّر كما هو إلى نفس RAG الموجود في `chat/index.ts` (الذي يدعم بالفعل قراءة `content` من `knowledge_items`).
-- حد أقصى ~200KB لكل سجل لتجنب تضخم القاعدة.
+### ح. محاكي الشات (Test Chat)
+- اختبار البوت داخل الموقع بنفس Edge Functions المستخدمة في القنوات الحقيقية.
 
-## النتيجة للمستخدم
-- يفتح "إضافة محتوى" → "صفحة سوشيال" → يختار صفحة الفيسبوك أو الإنستغرام المربوطة → يفعّل التحديث التلقائي → يضغط جلب.
-- يظهر في قاعدة المعرفة عدة عناصر (معلومات الصفحة + كل منشور) ويتعلم منها البوت فوراً.
-- يومياً يتم تحديث المحتوى تلقائياً دون تدخل.
+### ط. التحليلات والإشعارات
+- صفحة Analytics لعرض الأداء.
+- صفحة Notifications للتنبيهات.
+
+---
+
+## 2) ما يعمل بشكل جيد ✅
+
+- المصادقة ونظام الأدوار وسياسات RLS.
+- لوحة الأدمن: تفعيل/إيقاف وحذف بوتات المستخدمين (تم إصلاحها مؤخراً).
+- إعداد البوت (شخصية، لهجة، ترحيب، تعليمات).
+- قاعدة المعرفة: نص، FAQ، ملفات، URL (مع User-Agent محسّن لتقليل أخطاء 403).
+- ربط Telegram + Webhook + إرسال الردود.
+- محرك RAG عبر Gemini مع ذاكرة محادثة.
+- إنشاء ملف عميل تلقائي من جميع القنوات (Telegram / Messenger / WhatsApp).
+- المحاكي الداخلي (Test Chat).
+- المزامنة اليومية التلقائية لمحتوى السوشيال (cron).
+
+---
+
+## 3) ميزات تحتاج تحقق / قد لا تعمل بالكامل ⚠️
+
+- **Instagram / WhatsApp / Messenger Webhooks**: المنطق موجود لكن يحتاج اختبار end-to-end حقيقي مع حسابات تجارية مفعّلة على Meta.
+- **جلب محتوى صفحات Facebook/Instagram**: يعمل تقنياً لكن مشروط بصلاحيات Meta App (Page Public Content Access / Instagram Graph API permissions) وقد يحتاج App Review.
+- **تحليل الصور** (`analyze-image`): يحتاج اختبار جودة المخرجات.
+- **روابط URL**: بعض المواقع ترجع 403 رغم التحسينات (مواقع تستخدم Cloudflare/JS rendering).
+- **التحليلات (Analytics)**: واجهة موجودة لكن قد تحتاج المزيد من المقاييس الفعلية.
+
+---
+
+## 4) ميزات غير مكتملة / خارج نطاق MVP ❌
+
+- لا يوجد نظام دفع / اشتراكات.
+- لا توجد صناديق وارد داخلية (Inbox) لإدارة المحادثات يدوياً.
+- محدودية: بوت واحد لكل مستخدم.
+- لا يوجد تصدير بيانات العملاء (CSV/Excel).
+- لا يوجد نظام Tags متقدم للعملاء أو حملات تسويقية.
+- لا يوجد تكامل مع CRM خارجي.
+
+---
+
+## 5) اقتراحات للمراحل القادمة 💡
+
+**أولوية عالية:**
+1. إكمال اختبار قنوات Meta (Messenger/Instagram/WhatsApp) مع حسابات حقيقية وتوثيق خطوات الربط.
+2. تصدير العملاء (CSV) + إضافة Tags وحالات (عميل محتمل / مهتم / مغلق).
+3. صندوق محادثات موحّد (Unified Inbox) للرد اليدوي عند التسليم البشري.
+
+**أولوية متوسطة:**
+4. تحسين Analytics: معدل التحويل، أوقات الذروة، أكثر الأسئلة تكراراً.
+5. دعم أكثر من بوت لكل مستخدم + خطط اشتراك.
+6. تحسين استخراج URL عبر خدمة rendering (مثل ScrapingBee/Browserless) للمواقع المعقدة.
+
+**أولوية منخفضة:**
+7. تكامل CRM (HubSpot/Zoho).
+8. حملات إرسال جماعي عبر القنوات.
+9. تقارير دورية بالبريد لصاحب العمل.
+10. دعم الصوت (STT/TTS) للرد على الرسائل الصوتية.
+
+---
+
+## ملاحظة
+هذا التقرير وصفي فقط لعرض حالة المنصة. لا توجد تغييرات برمجية مطلوبة. عند الموافقة سأعتبر التقرير مُسلَّماً، ويمكن بعدها اختيار أي بند من الاقتراحات للبدء بتنفيذه.
