@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import AuthPage from "@/pages/Auth";
+import Landing from "@/pages/Landing";
 import DashboardPage from "@/pages/Dashboard";
 import KnowledgeBasePage from "@/pages/KnowledgeBase";
 import ChannelsPage from "@/pages/Channels";
@@ -30,8 +31,8 @@ const App = () => (
             {/* Auth route */}
             <Route path="/auth" element={<AuthPage />} />
             
-            {/* Redirect root to dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {/* Public landing */}
+            <Route path="/" element={<Landing />} />
             
             {/* Dashboard routes with layout */}
             <Route element={<DashboardLayout />}>
