@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { VisitorChat } from "@/components/landing/VisitorChat";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -264,6 +265,7 @@ export default function Landing() {
           </p>
         </div>
       </footer>
+      <VisitorChat />
     </div>
   );
 }
