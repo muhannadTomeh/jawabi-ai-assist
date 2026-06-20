@@ -45,12 +45,14 @@ Deno.serve(async (req) => {
 
     if (mode === "subscribe" && token && challenge) {
       // Check social_connections metadata for verify_token
-      const { data: socialConn } = await supabase
+      const { data: socialConns } = await supabase
         .from("social_connections")
-        .select("id")
-        .eq("platform", "facebook")
-        .filter("metadata->verify_token", "eq", token)
-        .maybeSingle();
+        .select("id, metadata")
+        .eq("platform", "facebook");
+
+      const socialConn = socialConns?.find(
+        (c: any) => c.metadata?.verify_token === token
+      );
 
       if (socialConn) {
         console.log("Webhook verified via social_connections:", socialConn.id);
@@ -58,12 +60,15 @@ Deno.serve(async (req) => {
       }
 
       // Fallback to legacy channels
-      const { data: channel } = await supabase
+      const { data: channels } = await supabase
         .from("channels")
         .select("*")
         .eq("platform", "messenger")
-        .filter("config->verify_token", "eq", token)
-        .maybeSingle();
+        .eq("is_connected", true);
+
+      const channel = channels?.find(
+        (c: any) => c.config?.verify_token === token
+      );
 
       if (channel) {
         console.log("Webhook verified for channel:", channel.id);

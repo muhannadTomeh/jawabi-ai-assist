@@ -1,114 +1,18 @@
-# تقرير حالة منصة Jawabi - وصف العمل والتقدم في التطوير
 
-منصة **Jawabi** هي نظام SaaS عربي (RTL) لإنشاء وإدارة بوتات محادثة ذكية مدعومة بالذكاء الاصطناعي، مع ربطها بقنوات التواصل الاجتماعي وقاعدة معرفة قابلة للتدريب.
+## Plan
 
----
+Fix Facebook Webhook verification in `supabase/functions/messenger-webhook/index.ts`.
 
-## 1) الميزات الأساسية والوظائف
+### Problem
+The current GET handler uses Supabase `.filter("metadata->verify_token", "eq", token)` to match JSONB fields. This operator does not work reliably for nested JSON string matching in Supabase PostgREST, causing webhook verification to fail silently.
 
-### أ. المصادقة وإدارة المستخدمين
-- تسجيل دخول / إنشاء حساب عبر البريد الإلكتروني (Lovable Cloud Auth).
-- نظام أدوار (admin / user) عبر جدول `user_roles` ودالة `has_role` آمنة.
-- لوحة تحكم خاصة بالأدمن (`/admin`) لإدارة جميع المستخدمين والبوتات.
+### Solution
+Replace both verification lookups (social_connections and legacy channels) with a fetch-then-filter pattern:
+1. Query all matching rows by basic filters (platform, is_connected).
+2. Filter the returned array in JavaScript by comparing `c.metadata?.verify_token === token` and `c.config?.verify_token === token`.
 
-### ب. لوحة التحكم (Dashboard)
-- إحصائيات عامة: عدد المحادثات، الرسائل، العملاء، نسبة الردود الناجحة.
-- ترحيب مخصص للمستخدمين الجدد مقابل العائدين.
+### Exact change
+- Replace lines 46–71 in `supabase/functions/messenger-webhook/index.ts` with the code provided by the user.
 
-### ج. إعداد البوت (Chatbot Configuration)
-- شخصية البوت (Persona)، اللهجة، رسالة الترحيب، تعليمات مخصصة.
-- تفعيل/إيقاف البوت (للمستخدم وللأدمن).
-
-### د. قاعدة المعرفة (Knowledge Base) - RAG
-- إضافة محتوى من عدة مصادر:
-  - نص حر
-  - أسئلة وأجوبة (FAQ)
-  - ملفات (حتى 10MB)
-  - صور (تحليل عبر AI)
-  - روابط URL (استخراج محتوى الصفحة)
-  - **سوشيال**: صفحات Facebook / Instagram عبر Graph API
-- مزامنة تلقائية يومية للمحتوى الاجتماعي (cron job 3 صباحاً).
-- مزامنة يدوية ("مزامنة الآن") لكل عنصر.
-
-### هـ. القنوات (Channels)
-- ربط: Telegram, Facebook Messenger, Instagram, WhatsApp.
-- Webhooks مستقلة لكل قناة.
-- ربط Facebook عبر OAuth.
-
-### و. محرك المحادثة (Chat Engine)
-- Lovable AI Gateway باستخدام `google/gemini-2.5-flash`.
-- RAG: استرجاع أفضل عناصر المعرفة قبل توليد الرد.
-- ذاكرة محادثة قصيرة المدى عبر القنوات.
-- التسليم البشري (Human Handover) عند انخفاض الثقة أو كلمات مفتاحية.
-
-### ز. العملاء (Customers)
-- إنشاء ملف عميل تلقائياً عند أول تواصل (بدون تكرار).
-- حفظ الاسم / اسم المستخدم / الرقم / القناة.
-- فرز وتصنيف العملاء لمساعدة صاحب العمل.
-
-### ح. محاكي الشات (Test Chat)
-- اختبار البوت داخل الموقع بنفس Edge Functions المستخدمة في القنوات الحقيقية.
-
-### ط. التحليلات والإشعارات
-- صفحة Analytics لعرض الأداء.
-- صفحة Notifications للتنبيهات.
-
----
-
-## 2) ما يعمل بشكل جيد ✅
-
-- المصادقة ونظام الأدوار وسياسات RLS.
-- لوحة الأدمن: تفعيل/إيقاف وحذف بوتات المستخدمين (تم إصلاحها مؤخراً).
-- إعداد البوت (شخصية، لهجة، ترحيب، تعليمات).
-- قاعدة المعرفة: نص، FAQ، ملفات، URL (مع User-Agent محسّن لتقليل أخطاء 403).
-- ربط Telegram + Webhook + إرسال الردود.
-- محرك RAG عبر Gemini مع ذاكرة محادثة.
-- إنشاء ملف عميل تلقائي من جميع القنوات (Telegram / Messenger / WhatsApp).
-- المحاكي الداخلي (Test Chat).
-- المزامنة اليومية التلقائية لمحتوى السوشيال (cron).
-
----
-
-## 3) ميزات تحتاج تحقق / قد لا تعمل بالكامل ⚠️
-
-- **Instagram / WhatsApp / Messenger Webhooks**: المنطق موجود لكن يحتاج اختبار end-to-end حقيقي مع حسابات تجارية مفعّلة على Meta.
-- **جلب محتوى صفحات Facebook/Instagram**: يعمل تقنياً لكن مشروط بصلاحيات Meta App (Page Public Content Access / Instagram Graph API permissions) وقد يحتاج App Review.
-- **تحليل الصور** (`analyze-image`): يحتاج اختبار جودة المخرجات.
-- **روابط URL**: بعض المواقع ترجع 403 رغم التحسينات (مواقع تستخدم Cloudflare/JS rendering).
-- **التحليلات (Analytics)**: واجهة موجودة لكن قد تحتاج المزيد من المقاييس الفعلية.
-
----
-
-## 4) ميزات غير مكتملة / خارج نطاق MVP ❌
-
-- لا يوجد نظام دفع / اشتراكات.
-- لا توجد صناديق وارد داخلية (Inbox) لإدارة المحادثات يدوياً.
-- محدودية: بوت واحد لكل مستخدم.
-- لا يوجد تصدير بيانات العملاء (CSV/Excel).
-- لا يوجد نظام Tags متقدم للعملاء أو حملات تسويقية.
-- لا يوجد تكامل مع CRM خارجي.
-
----
-
-## 5) اقتراحات للمراحل القادمة 💡
-
-**أولوية عالية:**
-1. إكمال اختبار قنوات Meta (Messenger/Instagram/WhatsApp) مع حسابات حقيقية وتوثيق خطوات الربط.
-2. تصدير العملاء (CSV) + إضافة Tags وحالات (عميل محتمل / مهتم / مغلق).
-3. صندوق محادثات موحّد (Unified Inbox) للرد اليدوي عند التسليم البشري.
-
-**أولوية متوسطة:**
-4. تحسين Analytics: معدل التحويل، أوقات الذروة، أكثر الأسئلة تكراراً.
-5. دعم أكثر من بوت لكل مستخدم + خطط اشتراك.
-6. تحسين استخراج URL عبر خدمة rendering (مثل ScrapingBee/Browserless) للمواقع المعقدة.
-
-**أولوية منخفضة:**
-7. تكامل CRM (HubSpot/Zoho).
-8. حملات إرسال جماعي عبر القنوات.
-9. تقارير دورية بالبريد لصاحب العمل.
-10. دعم الصوت (STT/TTS) للرد على الرسائل الصوتية.
-
----
-
-## ملاحظة
-هذا التقرير وصفي فقط لعرض حالة المنصة. لا توجد تغييرات برمجية مطلوبة. عند الموافقة سأعتبر التقرير مُسلَّماً، ويمكن بعدها اختيار أي بند من الاقتراحات للبدء بتنفيذه.
+### Deploy
+- Lovable-managed edge functions deploy automatically after file change.
