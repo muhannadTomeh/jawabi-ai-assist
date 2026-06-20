@@ -260,6 +260,70 @@ export type Database = {
           },
         ]
       }
+      messenger_messages: {
+        Row: {
+          chatbot_id: string
+          content: string
+          created_at: string
+          id: string
+          messenger_user_id: string
+          role: string
+        }
+        Insert: {
+          chatbot_id: string
+          content: string
+          created_at?: string
+          id?: string
+          messenger_user_id: string
+          role: string
+        }
+        Update: {
+          chatbot_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          messenger_user_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messenger_messages_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messenger_users: {
+        Row: {
+          chatbot_id: string
+          created_at: string
+          id: string
+          messenger_user_id: string
+        }
+        Insert: {
+          chatbot_id: string
+          created_at?: string
+          id?: string
+          messenger_user_id: string
+        }
+        Update: {
+          chatbot_id?: string
+          created_at?: string
+          id?: string
+          messenger_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messenger_users_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           channel: string
