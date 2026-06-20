@@ -25,6 +25,143 @@ interface MessengerWebhook {
   entry: MessengerEntry[];
 }
 
+function getDialectInstruction(dialect: string): string {
+  if (dialect === "palestinian") {
+    return `\n\nاللهجة: تحدث باللهجة العامية الفلسطينية. استخدم تعبيرات مثل "كيفك"، "شو"، "هلأ"، "إنشاء الله"، "يعطيك العافية" وما شابه. لا تستخدم الفصحى.`;
+  }
+  return `\n\nاللهجة: تحدث بالعربية الفصحى الرسمية.`;
+}
+
+async function generateAIResponse(
+  userMessage: string,
+  knowledgeContext: string,
+  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string },
+  conversationHistory: { role: string; content: string }[]
+): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return chatbot.fallback_message;
+
+  const customInstructions = chatbot.custom_instructions
+    ? `\n\nتعليمات إضافية من المالك:\n${chatbot.custom_instructions}`
+    : "";
+  const dialectInstruction = getDialectInstruction(chatbot.dialect || "formal");
+
+  const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}".
+نبرتك: ${chatbot.tone}
+اللغة: ${chatbot.language}${dialectInstruction}
+
+قاعدة المعرفة الخاصة بك:
+${knowledgeContext || "لا توجد معلومات في قاعدة المعرفة حالياً."}
+
+التعليمات:
+- أجب على أسئلة المستخدم بناءً على قاعدة المعرفة المتاحة فقط.
+- إذا لم تجد إجابة في قاعدة المعرفة، أجب بـ: "${chatbot.fallback_message}"
+- كن مختصراً ومفيداً.
+- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.
+- لا ترحب بالمستخدم ولا تقل "أهلاً" أو "مرحباً" في بداية كل رد. ادخل في الموضوع مباشرة.
+- لديك ذاكرة محادثة - استخدم السياق السابق للرد بشكل متسق وطبيعي.${customInstructions}`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory,
+    { role: "user", content: userMessage },
+  ];
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
+    });
+    if (!response.ok) {
+      console.error("AI gateway error:", response.status, await response.text());
+      return chatbot.fallback_message;
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || chatbot.fallback_message;
+  } catch (e) {
+    console.error("AI call failed:", e);
+    return chatbot.fallback_message;
+  }
+}
+
+async function getOrCreateMessengerUser(
+  supabase: ReturnType<typeof createClient>,
+  chatbotId: string,
+  messengerUserId: string
+): Promise<{ isNew: boolean }> {
+  const { data: existing } = await supabase
+    .from("messenger_users")
+    .select("id")
+    .eq("chatbot_id", chatbotId)
+    .eq("messenger_user_id", messengerUserId)
+    .maybeSingle();
+  if (existing) return { isNew: false };
+  await supabase.from("messenger_users").insert({ chatbot_id: chatbotId, messenger_user_id: messengerUserId });
+  return { isNew: true };
+}
+
+async function getMessengerHistory(
+  supabase: ReturnType<typeof createClient>,
+  chatbotId: string,
+  messengerUserId: string
+): Promise<{ role: string; content: string }[]> {
+  const { data } = await supabase
+    .from("messenger_messages")
+    .select("role, content")
+    .eq("chatbot_id", chatbotId)
+    .eq("messenger_user_id", messengerUserId)
+    .order("created_at", { ascending: true })
+    .limit(10);
+  return data || [];
+}
+
+async function saveMessengerMessages(
+  supabase: ReturnType<typeof createClient>,
+  chatbotId: string,
+  messengerUserId: string,
+  userMsg: string,
+  assistantMsg: string
+) {
+  await supabase.from("messenger_messages").insert([
+    { chatbot_id: chatbotId, messenger_user_id: messengerUserId, role: "user", content: userMsg },
+    { chatbot_id: chatbotId, messenger_user_id: messengerUserId, role: "assistant", content: assistantMsg },
+  ]);
+  const { data: allMsgs } = await supabase
+    .from("messenger_messages")
+    .select("id, created_at")
+    .eq("chatbot_id", chatbotId)
+    .eq("messenger_user_id", messengerUserId)
+    .order("created_at", { ascending: false });
+  if (allMsgs && allMsgs.length > 10) {
+    const idsToDelete = allMsgs.slice(10).map((m) => m.id);
+    await supabase.from("messenger_messages").delete().in("id", idsToDelete);
+  }
+}
+
+async function sendMessengerText(pageAccessToken: string, recipientId: string, text: string) {
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+  });
+  if (!r.ok) console.error("Messenger sendText error:", await r.text());
+}
+
+async function sendMessengerImage(pageAccessToken: string, recipientId: string, imageUrl: string) {
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      message: { attachment: { type: "image", payload: { url: imageUrl, is_reusable: true } } },
+    }),
+  });
+  if (!r.ok) console.error("Messenger sendImage error:", await r.text());
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -145,41 +282,146 @@ Deno.serve(async (req) => {
           _last_message: userMessage,
         });
 
-        // Generate response
-        let responseText = chatbot.fallback_message;
+        // Track new vs existing user, send welcome on first contact
+        const { isNew } = await getOrCreateMessengerUser(supabase, chatbot.id, senderId);
+        if (isNew) {
+          const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
+          await sendMessengerText(pageAccessToken, senderId, welcomeMsg);
+        }
 
-        // Check knowledge base
-        const { data: faqs } = await supabase
-          .from("knowledge_items")
+        // Conversation history
+        const conversationHistory = await getMessengerHistory(supabase, chatbot.id, senderId);
+
+        // Handover settings
+        const { data: handover } = await supabase
+          .from("handover_settings")
           .select("*")
           .eq("chatbot_id", chatbot.id)
-          .eq("type", "faq");
+          .maybeSingle();
 
-        if (faqs && faqs.length > 0) {
-          const matchedFaq = faqs.find(
-            (faq) =>
-              faq.question &&
-              userMessage.toLowerCase().includes(faq.question.toLowerCase())
+        const createNotification = async (type: string, title: string) => {
+          await supabase.from("notifications").insert({
+            chatbot_id: chatbot.id,
+            type,
+            title,
+            channel: "facebook",
+            contact_identifier: senderId,
+            contact_name: null,
+            last_message: userMessage,
+          });
+        };
+
+        // Keyword-based handover
+        if (handover?.enabled && Array.isArray(handover.trigger_keywords)) {
+          const lower = userMessage.toLowerCase();
+          const triggered = handover.trigger_keywords.some(
+            (kw: string) => kw && lower.includes(kw.toLowerCase())
           );
-          if (matchedFaq && matchedFaq.answer) {
-            responseText = matchedFaq.answer;
+          if (triggered) {
+            const handoverMsg = handover.handover_message || "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
+            await saveMessengerMessages(supabase, chatbot.id, senderId, userMessage, handoverMsg);
+            await createNotification("human_request", "طلب التحدث مع موظف");
+            await sendMessengerText(pageAccessToken, senderId, handoverMsg);
+            continue;
           }
         }
 
-        // Send response via Messenger API
-        const messengerApiUrl = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
-        const messengerResponse = await fetch(messengerApiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: { id: senderId },
-            message: { text: responseText },
-          }),
-        });
+        // Sale-intent detection
+        if (handover?.enabled) {
+          try {
+            const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+            const intentRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableApiKey}` },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash-lite",
+                messages: [
+                  { role: "system", content: 'صنّف الرسالة. أجب فقط بكلمة واحدة: "sale" إذا كان الزبون يريد إجراء عملية شراء حقيقية الآن، أو "no" في غير ذلك.' },
+                  { role: "user", content: userMessage },
+                ],
+                max_tokens: 5,
+              }),
+            });
+            if (intentRes.ok) {
+              const intentData = await intentRes.json();
+              const intent = (intentData.choices?.[0]?.message?.content || "").toLowerCase().trim();
+              if (intent.includes("sale")) {
+                const saleMsg = handover.sale_message || "سأقوم بتحويلك إلى موظف المبيعات.";
+                await saveMessengerMessages(supabase, chatbot.id, senderId, userMessage, saleMsg);
+                if (handover.trigger_on_sale === true) {
+                  await createNotification("sale", "طلب شراء");
+                }
+                await sendMessengerText(pageAccessToken, senderId, saleMsg);
+                continue;
+              }
+            }
+          } catch (e) {
+            console.error("Sale intent failed:", e);
+          }
+        }
 
-        if (!messengerResponse.ok) {
-          const errorData = await messengerResponse.text();
-          console.error("Messenger API error:", errorData);
+        // Build knowledge context
+        const { data: knowledgeItems } = await supabase
+          .from("knowledge_items")
+          .select("*")
+          .eq("chatbot_id", chatbot.id);
+
+        let knowledgeContext = "";
+        if (knowledgeItems && knowledgeItems.length > 0) {
+          const parts: string[] = [];
+          for (const item of knowledgeItems) {
+            if (item.type === "faq" && item.question && item.answer) {
+              parts.push(`سؤال: ${item.question}\nجواب: ${item.answer}`);
+            } else if ((item.type === "text" || item.type === "url" || item.type === "social") && item.content) {
+              parts.push(`${item.title}:\n${item.content}`);
+            } else if (item.type === "file" && item.content) {
+              parts.push(`ملف "${item.title}":\n${item.content}`);
+            } else if (item.type === "image" && item.file_url) {
+              parts.push(`صورة بعنوان "${item.title}":\nالوصف: ${item.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${item.file_url}]`);
+            }
+          }
+          knowledgeContext = parts.join("\n\n---\n\n");
+          if (knowledgeItems.some((i) => i.type === "image" && i.file_url)) {
+            knowledgeContext += `\n\n---\nملاحظة: عندما يطلب المستخدم رؤية صورة أو حين تكون الصورة هي أفضل إجابة، أرسلها بإضافة [IMAGE:<الرابط>] في ردك تماماً كما هو، ولا تخترع روابط.`;
+          }
+        }
+
+        // Generate AI response
+        let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
+
+        // Failed-responses handover
+        if (handover?.enabled && responseText.trim() === (chatbot.fallback_message || "").trim()) {
+          const threshold = handover.failed_responses_threshold || 3;
+          const { data: lastAssistant } = await supabase
+            .from("messenger_messages")
+            .select("content")
+            .eq("chatbot_id", chatbot.id)
+            .eq("messenger_user_id", senderId)
+            .eq("role", "assistant")
+            .order("created_at", { ascending: false })
+            .limit(threshold - 1);
+          const fails = (lastAssistant || []).filter((m) => m.content.trim() === chatbot.fallback_message.trim()).length + 1;
+          if (fails >= threshold) {
+            responseText = handover.handover_message || "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
+            await createNotification("unclear", "سؤال غير مفهوم");
+          }
+        }
+
+        // Save messages
+        await saveMessengerMessages(supabase, chatbot.id, senderId, userMessage, responseText);
+
+        // Extract [IMAGE:url] tokens
+        const imageRegex = /\[IMAGE:(https?:\/\/[^\s\]]+)\]/g;
+        const imageUrls: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = imageRegex.exec(responseText)) !== null) imageUrls.push(m[1]);
+        const cleanedText = responseText.replace(imageRegex, "").trim();
+
+        for (const imgUrl of imageUrls) {
+          await sendMessengerImage(pageAccessToken, senderId, imgUrl);
+        }
+        if (cleanedText) {
+          await sendMessengerText(pageAccessToken, senderId, cleanedText);
         }
       }
     }
