@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, Settings, Loader2, Unlink } from 'lucide-react';
+import { ExternalLink, Settings, Loader2, Unlink, Copy, Check, Globe } from 'lucide-react';
 import { FaTelegram, FaFacebookMessenger, FaInstagram, FaWhatsapp } from 'react-icons/fa';
 import type { IconType } from 'react-icons';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
@@ -79,6 +80,7 @@ export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [oauthPlatform, setOauthPlatform] = useState<'facebook' | 'instagram' | 'whatsapp' | null>(null);
   const [disconnectPlatform, setDisconnectPlatform] = useState<Platform | null>(null);
@@ -269,6 +271,17 @@ export default function ChannelsPage() {
   }
 
   const platforms: Platform[] = ['telegram', 'facebook', 'instagram', 'whatsapp'];
+  const publicUrl = chatbot?.public_slug
+    ? `${window.location.origin}/chat/${chatbot.public_slug}`
+    : null;
+
+  const copyLink = async () => {
+    if (!publicUrl) return;
+    await navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    toast({ title: 'تم النسخ', description: 'تم نسخ رابط الشات بوت' });
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -276,6 +289,35 @@ export default function ChannelsPage() {
         <h1 className="text-2xl font-semibold text-foreground">القنوات</h1>
         <p className="mt-1 text-muted-foreground">اربط الشات بوت بمنصات المراسلة</p>
       </div>
+
+      {publicUrl && (
+        <div className="card-elevated p-6">
+          <div className="flex items-start gap-4">
+            <div className="rounded-xl bg-primary/10 p-3">
+              <Globe className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-foreground">رابط الشات بوت العام</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                شارك هذا الرابط مع عملائك ليتمكنوا من التحدث مع البوت مباشرة من المتصفح
+              </p>
+              <div className="mt-4 flex gap-2">
+                <Input value={publicUrl} readOnly dir="ltr" className="font-mono text-sm" />
+                <Button onClick={copyLink} variant="outline" className="shrink-0">
+                  {copied ? <Check className="ml-2 h-4 w-4" /> : <Copy className="ml-2 h-4 w-4" />}
+                  {copied ? 'تم النسخ' : 'نسخ'}
+                </Button>
+                <Button asChild variant="outline" className="shrink-0">
+                  <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                    فتح
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {platforms.map((platform) => {

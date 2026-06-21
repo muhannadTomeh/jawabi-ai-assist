@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatbot } from '@/hooks/useChatbot';
 import { toast } from 'sonner';
+import { ChannelIcon } from '@/components/ChannelIcon';
 
 type Tag = 'new' | 'prospect' | 'regular' | 'vip' | 'blocked';
 
@@ -245,6 +246,7 @@ export default function CustomersPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
+                    <ChannelIcon channel={c.channel} size={18} />
                     <span className="font-semibold text-foreground">
                       {c.name || c.username || c.phone || c.external_id}
                     </span>

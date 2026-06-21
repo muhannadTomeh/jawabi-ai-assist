@@ -6,6 +6,7 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatbot } from '@/hooks/useChatbot';
+import { ChannelIcon } from '@/components/ChannelIcon';
 
 type PlatformKey = 'telegram' | 'facebook' | 'instagram' | 'whatsapp';
 
@@ -212,9 +213,7 @@ export default function DashboardPage() {
                 className="flex items-center justify-between rounded-lg border border-border p-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-muted p-2">
-                    <Share2 className="h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <ChannelIcon channel={c.platform} withBg />
                   <span className="font-medium text-foreground">{platformLabels[c.platform]}</span>
                 </div>
                 <StatusBadge status={c.connected ? 'connected' : 'disconnected'} />
