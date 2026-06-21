@@ -54,6 +54,10 @@ export type Database = {
       }
       chatbots: {
         Row: {
+          business_category: string | null
+          business_description: string | null
+          business_location: string | null
+          business_name: string | null
           created_at: string
           custom_instructions: string
           dialect: string
@@ -62,12 +66,19 @@ export type Database = {
           is_active: boolean
           language: string
           name: string
+          onboarding_completed: boolean
+          onboarding_step: number
+          public_slug: string | null
           tone: string
           updated_at: string
           user_id: string
           welcome_message: string
         }
         Insert: {
+          business_category?: string | null
+          business_description?: string | null
+          business_location?: string | null
+          business_name?: string | null
           created_at?: string
           custom_instructions?: string
           dialect?: string
@@ -76,12 +87,19 @@ export type Database = {
           is_active?: boolean
           language?: string
           name: string
+          onboarding_completed?: boolean
+          onboarding_step?: number
+          public_slug?: string | null
           tone?: string
           updated_at?: string
           user_id: string
           welcome_message?: string
         }
         Update: {
+          business_category?: string | null
+          business_description?: string | null
+          business_location?: string | null
+          business_name?: string | null
           created_at?: string
           custom_instructions?: string
           dialect?: string
@@ -90,6 +108,9 @@ export type Database = {
           is_active?: boolean
           language?: string
           name?: string
+          onboarding_completed?: boolean
+          onboarding_step?: number
+          public_slug?: string | null
           tone?: string
           updated_at?: string
           user_id?: string

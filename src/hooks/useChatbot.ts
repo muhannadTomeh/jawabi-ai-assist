@@ -15,6 +15,13 @@ interface Chatbot {
   dialect: string;
   created_at: string;
   updated_at: string;
+  business_name?: string | null;
+  business_category?: string | null;
+  business_location?: string | null;
+  business_description?: string | null;
+  onboarding_completed?: boolean;
+  onboarding_step?: number;
+  public_slug?: string | null;
 }
 
 export function useChatbot() {

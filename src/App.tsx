@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import AuthPage from "@/pages/Auth";
 import Landing from "@/pages/Landing";
+import Onboarding from "@/pages/Onboarding";
 import DashboardPage from "@/pages/Dashboard";
 import KnowledgeBasePage from "@/pages/KnowledgeBase";
 import ChannelsPage from "@/pages/Channels";
@@ -33,6 +34,9 @@ const App = () => (
             
             {/* Public landing */}
             <Route path="/" element={<Landing />} />
+
+            {/* Onboarding (auth required, no sidebar) */}
+            <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Dashboard routes with layout */}
             <Route element={<DashboardLayout />}>
