@@ -12,11 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { message, chatbot_id, conversation_history, user_id } = await req.json();
+    const { message, chatbot_id: chatbotIdIn, public_slug, conversation_history, user_id } = await req.json();
 
-    if (!message || !chatbot_id) {
+    if (!message || (!chatbotIdIn && !public_slug)) {
       return new Response(
-        JSON.stringify({ error: "message and chatbot_id are required" }),
+        JSON.stringify({ error: "message and chatbot_id or public_slug are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -24,6 +24,23 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    let chatbot_id = chatbotIdIn as string | undefined;
+    if (!chatbot_id && public_slug) {
+      const { data: bySlug } = await supabase
+        .from("chatbots")
+        .select("id")
+        .eq("public_slug", public_slug)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!bySlug) {
+        return new Response(
+          JSON.stringify({ error: "Chatbot not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      chatbot_id = bySlug.id;
+    }
 
     // Record customer profile for web channel (if identifiable)
     if (user_id) {
@@ -243,16 +260,25 @@ ${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledge
     // Add current message
     messages.push({ role: "user", content: message });
 
-    // Call Lovable AI
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    // Resolve model + API key (admin-configurable via llm_settings)
+    const { data: llmCfg } = await supabase
+      .from("llm_settings")
+      .select("model, custom_api_key")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const model = llmCfg?.model || "google/gemini-2.5-flash";
+    const apiKey = llmCfg?.custom_api_key || Deno.env.get("LOVABLE_API_KEY");
+
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${lovableApiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages,
         max_tokens: 1024,
       }),
