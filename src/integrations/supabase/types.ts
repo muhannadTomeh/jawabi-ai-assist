@@ -281,6 +281,30 @@ export type Database = {
           },
         ]
       }
+      llm_settings: {
+        Row: {
+          custom_api_key: string | null
+          id: string
+          model: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          custom_api_key?: string | null
+          id?: string
+          model?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          custom_api_key?: string | null
+          id?: string
+          model?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       messenger_messages: {
         Row: {
           chatbot_id: string
@@ -671,6 +695,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_chatbot_by_slug: {
+        Args: { _slug: string }
+        Returns: {
+          fallback_message: string
+          id: string
+          language: string
+          name: string
+          welcome_message: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

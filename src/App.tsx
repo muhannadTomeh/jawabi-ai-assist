@@ -18,6 +18,7 @@ import AdminPage from "@/pages/Admin";
 import NotificationsPage from "@/pages/Notifications";
 import CustomersPage from "@/pages/Customers";
 import NotFound from "@/pages/NotFound";
+import PublicChat from "@/pages/PublicChat";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,9 @@ const App = () => (
             
             {/* Public landing */}
             <Route path="/" element={<Landing />} />
+
+            {/* Public shareable chat */}
+            <Route path="/chat/:slug" element={<PublicChat />} />
 
             {/* Onboarding (auth required, no sidebar) */}
             <Route path="/onboarding" element={<Onboarding />} />
