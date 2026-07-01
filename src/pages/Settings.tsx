@@ -37,6 +37,8 @@ export default function SettingsPage() {
   const [triggerOnSale, setTriggerOnSale] = useState(false);
   const [saleMessage, setSaleMessage] = useState('سأقوم بتحويلك إلى أحد موظفي المبيعات لإتمام طلبك.');
   const [handoverSettingsId, setHandoverSettingsId] = useState<string | null>(null);
+  const [takeoverMode, setTakeoverMode] = useState(false);
+  const [takeoverTimeout, setTakeoverTimeout] = useState(60);
 
   useEffect(() => {
     if (chatbot) {
@@ -66,6 +68,8 @@ export default function SettingsPage() {
       setFailedThreshold(data.failed_responses_threshold ?? 3);
       setTriggerOnSale((data as any).trigger_on_sale ?? false);
       setSaleMessage((data as any).sale_message ?? 'سأقوم بتحويلك إلى أحد موظفي المبيعات لإتمام طلبك.');
+      setTakeoverMode((data as any).takeover_mode_enabled ?? false);
+      setTakeoverTimeout((data as any).takeover_timeout_minutes ?? 60);
     }
   };
 
@@ -95,6 +99,8 @@ export default function SettingsPage() {
         failed_responses_threshold: failedThreshold,
         trigger_on_sale: triggerOnSale,
         sale_message: saleMessage,
+        takeover_mode_enabled: takeoverMode,
+        takeover_timeout_minutes: takeoverTimeout,
       } as any;
       if (handoverSettingsId) {
         const { error } = await supabase
