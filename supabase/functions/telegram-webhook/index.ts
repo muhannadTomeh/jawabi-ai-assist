@@ -272,6 +272,43 @@ Deno.serve(async (req) => {
       .eq("chatbot_id", chatbot.id)
       .maybeSingle();
 
+    // Human takeover: if a human recently intervened in this conversation, stay silent
+    if (handover?.takeover_mode_enabled) {
+      const { data: takeover } = await supabase
+        .from("conversation_takeovers")
+        .select("active,last_human_at")
+        .eq("chatbot_id", chatbot.id)
+        .eq("channel", "telegram")
+        .eq("external_id", String(telegramUserId))
+        .maybeSingle();
+      if (takeover?.active) {
+        const timeoutMin = handover.takeover_timeout_minutes || 60;
+        const lastHuman = new Date(takeover.last_human_at as string).getTime();
+        const stillActive = Date.now() - lastHuman < timeoutMin * 60 * 1000;
+        if (stillActive) {
+          // Save the user's message but do NOT generate a bot reply
+          await supabase.from("telegram_messages").insert({
+            telegram_user_id: telegramUserId,
+            chatbot_id: chatbot.id,
+            role: "user",
+            content: userMessage,
+          });
+          console.log("Skipping bot: conversation under human takeover", telegramUserId);
+          return new Response(JSON.stringify({ ok: true, takeover: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } else {
+          // Auto-expire takeover
+          await supabase
+            .from("conversation_takeovers")
+            .update({ active: false })
+            .eq("chatbot_id", chatbot.id)
+            .eq("channel", "telegram")
+            .eq("external_id", String(telegramUserId));
+        }
+      }
+    }
+
     // Helper to create a notification
     const createNotification = async (type: string, title: string) => {
       await supabase.from("notifications").insert({

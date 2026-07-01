@@ -118,6 +118,50 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_takeovers: {
+        Row: {
+          active: boolean
+          channel: string
+          chatbot_id: string
+          created_at: string
+          external_id: string
+          id: string
+          last_human_at: string
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          channel: string
+          chatbot_id: string
+          created_at?: string
+          external_id: string
+          id?: string
+          last_human_at?: string
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          channel?: string
+          chatbot_id?: string
+          created_at?: string
+          external_id?: string
+          id?: string
+          last_human_at?: string
+          source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_takeovers_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           channel: string
@@ -182,6 +226,8 @@ export type Database = {
           id: string
           low_confidence_threshold: number
           sale_message: string
+          takeover_mode_enabled: boolean
+          takeover_timeout_minutes: number
           trigger_keywords: string[]
           trigger_on_low_confidence: boolean
           trigger_on_sale: boolean
@@ -196,6 +242,8 @@ export type Database = {
           id?: string
           low_confidence_threshold?: number
           sale_message?: string
+          takeover_mode_enabled?: boolean
+          takeover_timeout_minutes?: number
           trigger_keywords?: string[]
           trigger_on_low_confidence?: boolean
           trigger_on_sale?: boolean
@@ -210,6 +258,8 @@ export type Database = {
           id?: string
           low_confidence_threshold?: number
           sale_message?: string
+          takeover_mode_enabled?: boolean
+          takeover_timeout_minutes?: number
           trigger_keywords?: string[]
           trigger_on_low_confidence?: boolean
           trigger_on_sale?: boolean

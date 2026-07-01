@@ -37,6 +37,8 @@ export default function SettingsPage() {
   const [triggerOnSale, setTriggerOnSale] = useState(false);
   const [saleMessage, setSaleMessage] = useState('سأقوم بتحويلك إلى أحد موظفي المبيعات لإتمام طلبك.');
   const [handoverSettingsId, setHandoverSettingsId] = useState<string | null>(null);
+  const [takeoverMode, setTakeoverMode] = useState(false);
+  const [takeoverTimeout, setTakeoverTimeout] = useState(60);
 
   useEffect(() => {
     if (chatbot) {
@@ -66,6 +68,8 @@ export default function SettingsPage() {
       setFailedThreshold(data.failed_responses_threshold ?? 3);
       setTriggerOnSale((data as any).trigger_on_sale ?? false);
       setSaleMessage((data as any).sale_message ?? 'سأقوم بتحويلك إلى أحد موظفي المبيعات لإتمام طلبك.');
+      setTakeoverMode((data as any).takeover_mode_enabled ?? false);
+      setTakeoverTimeout((data as any).takeover_timeout_minutes ?? 60);
     }
   };
 
@@ -95,6 +99,8 @@ export default function SettingsPage() {
         failed_responses_threshold: failedThreshold,
         trigger_on_sale: triggerOnSale,
         sale_message: saleMessage,
+        takeover_mode_enabled: takeoverMode,
+        takeover_timeout_minutes: takeoverTimeout,
       } as any;
       if (handoverSettingsId) {
         const { error } = await supabase
@@ -363,6 +369,38 @@ export default function SettingsPage() {
                   الرسالة المرسلة للمستخدم عند تحويله لموظف الدعم
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="card-elevated p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-foreground">وضع التدخل البشري</h3>
+                  <p className="text-sm text-muted-foreground">
+                    عندما يرد موظف يدوياً على المحادثة، يتوقف البوت مؤقتاً عن الرد لتفادي التداخل.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={takeoverMode}
+                onCheckedChange={setTakeoverMode}
+              />
+            </div>
+            <div className={takeoverMode ? 'space-y-2' : 'pointer-events-none opacity-50 space-y-2'}>
+              <Label htmlFor="takeoverTimeout">مدة إيقاف البوت (بالدقائق)</Label>
+              <Input
+                id="takeoverTimeout"
+                type="number"
+                min={5}
+                max={1440}
+                value={takeoverTimeout}
+                onChange={(e) => setTakeoverTimeout(Number(e.target.value) || 60)}
+              />
+              <p className="text-xs text-muted-foreground">
+                يبقى البوت متوقفاً في تلك المحادثة حتى تمر هذه المدة من دون تدخل بشري إضافي.
+              </p>
             </div>
           </div>
         </TabsContent>

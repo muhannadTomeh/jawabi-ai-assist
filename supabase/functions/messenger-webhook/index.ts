@@ -16,6 +16,8 @@ interface MessengerEntry {
     message?: {
       mid: string;
       text?: string;
+      is_echo?: boolean;
+      app_id?: number;
     };
   }>;
 }
@@ -268,6 +270,32 @@ Deno.serve(async (req) => {
       for (const messaging of entry.messaging) {
         if (!messaging.message?.text) continue;
 
+        // Echo events represent messages the Page itself sent (from Inbox,
+        // dashboard, or another tool). Use them to flag human takeover, then skip.
+        if (messaging.message.is_echo) {
+          const recipientId = messaging.recipient?.id;
+          // Ignore echoes we produced ourselves (app_id belongs to our app)
+          // by checking if there is no matching app_id filter — we mark takeover
+          // only when the echo comes from a *different* app (Page Inbox / human).
+          const ourAppId = messaging.message.app_id;
+          const looksLikeHuman = !ourAppId || ourAppId === 0;
+          if (recipientId && looksLikeHuman) {
+            await supabase.from("conversation_takeovers").upsert(
+              {
+                chatbot_id: chatbot.id,
+                channel: "facebook",
+                external_id: recipientId,
+                active: true,
+                last_human_at: new Date().toISOString(),
+                source: "messenger_echo",
+              },
+              { onConflict: "chatbot_id,channel,external_id" }
+            );
+            console.log("Human takeover flagged via echo for", recipientId);
+          }
+          continue;
+        }
+
         const senderId = messaging.sender.id;
         const userMessage = messaging.message.text;
 
@@ -298,6 +326,38 @@ Deno.serve(async (req) => {
           .select("*")
           .eq("chatbot_id", chatbot.id)
           .maybeSingle();
+
+        // Human takeover check
+        if (handover?.takeover_mode_enabled) {
+          const { data: takeover } = await supabase
+            .from("conversation_takeovers")
+            .select("active,last_human_at")
+            .eq("chatbot_id", chatbot.id)
+            .eq("channel", "facebook")
+            .eq("external_id", senderId)
+            .maybeSingle();
+          if (takeover?.active) {
+            const timeoutMin = handover.takeover_timeout_minutes || 60;
+            const lastHuman = new Date(takeover.last_human_at as string).getTime();
+            if (Date.now() - lastHuman < timeoutMin * 60 * 1000) {
+              await supabase.from("messenger_messages").insert({
+                chatbot_id: chatbot.id,
+                messenger_user_id: senderId,
+                role: "user",
+                content: userMessage,
+              });
+              console.log("Skipping Messenger reply: human takeover active for", senderId);
+              continue;
+            } else {
+              await supabase
+                .from("conversation_takeovers")
+                .update({ active: false })
+                .eq("chatbot_id", chatbot.id)
+                .eq("channel", "facebook")
+                .eq("external_id", senderId);
+            }
+          }
+        }
 
         const createNotification = async (type: string, title: string) => {
           await supabase.from("notifications").insert({

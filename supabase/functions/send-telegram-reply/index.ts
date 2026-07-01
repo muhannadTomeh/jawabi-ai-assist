@@ -97,6 +97,19 @@ Deno.serve(async (req) => {
       content: `[👤 موظف] ${message}`,
     });
 
+    // Mark this conversation as under human takeover
+    await supabase.from("conversation_takeovers").upsert(
+      {
+        chatbot_id,
+        channel: "telegram",
+        external_id: String(telegram_user_id),
+        active: true,
+        last_human_at: new Date().toISOString(),
+        source: "dashboard",
+      },
+      { onConflict: "chatbot_id,channel,external_id" }
+    );
+
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
