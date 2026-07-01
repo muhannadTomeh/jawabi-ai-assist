@@ -16,6 +16,8 @@ interface MessengerEntry {
     message?: {
       mid: string;
       text?: string;
+      is_echo?: boolean;
+      app_id?: number;
     };
   }>;
 }
