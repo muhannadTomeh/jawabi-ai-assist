@@ -371,6 +371,38 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
+          <div className="card-elevated p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-foreground">وضع التدخل البشري</h3>
+                  <p className="text-sm text-muted-foreground">
+                    عندما يرد موظف يدوياً على المحادثة، يتوقف البوت مؤقتاً عن الرد لتفادي التداخل.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={takeoverMode}
+                onCheckedChange={setTakeoverMode}
+              />
+            </div>
+            <div className={takeoverMode ? 'space-y-2' : 'pointer-events-none opacity-50 space-y-2'}>
+              <Label htmlFor="takeoverTimeout">مدة إيقاف البوت (بالدقائق)</Label>
+              <Input
+                id="takeoverTimeout"
+                type="number"
+                min={5}
+                max={1440}
+                value={takeoverTimeout}
+                onChange={(e) => setTakeoverTimeout(Number(e.target.value) || 60)}
+              />
+              <p className="text-xs text-muted-foreground">
+                يبقى البوت متوقفاً في تلك المحادثة حتى تمر هذه المدة من دون تدخل بشري إضافي.
+              </p>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
