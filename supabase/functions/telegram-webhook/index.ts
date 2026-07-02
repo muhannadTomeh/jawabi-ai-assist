@@ -21,6 +21,13 @@ interface TelegramUpdate {
     };
     text?: string;
     date: number;
+    reply_to_message?: { message_id: number; chat: { id: number } };
+  };
+  callback_query?: {
+    id: string;
+    from: { id: number; first_name: string; username?: string };
+    message?: { message_id: number; chat: { id: number } };
+    data?: string;
   };
 }
 
