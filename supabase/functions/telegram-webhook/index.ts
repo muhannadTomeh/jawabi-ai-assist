@@ -584,6 +584,12 @@ Deno.serve(async (req) => {
           parts.push(`${item.title}:\n${item.content}`);
         } else if (item.type === "file" && item.content) {
           parts.push(`ملف "${item.title}":\n${item.content}`);
+        } else if ((item.type === "url" || item.type === "social") && item.content) {
+          parts.push(
+            item.file_url
+              ? `${item.title} (المصدر: ${item.file_url}):\n${item.content}`
+              : `${item.title}:\n${item.content}`
+          );
         } else if (item.type === "image" && item.file_url) {
           parts.push(
             `صورة بعنوان "${item.title}":\nالوصف: ${item.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${item.file_url}]`
@@ -596,8 +602,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate AI response with conversation history
-    let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
+    // Generate AI response with conversation history (unified LLM settings from admin)
+    let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory, supabase);
 
     // Unclear-question handover (consecutive fallback responses)
     if (handover?.enabled && responseText.trim() === chatbot.fallback_message.trim()) {
