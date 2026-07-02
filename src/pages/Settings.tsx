@@ -272,6 +272,40 @@ export default function SettingsPage() {
                   أوامر وتعليمات مخصصة تحدد كيف يتعامل البوت مع الأسئلة خارج قاعدة المعرفة.
                 </p>
               </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="botMode">وضع عمل البوت</Label>
+                <Select value={botMode} onValueChange={(v) => setBotMode(v as typeof botMode)}>
+                  <SelectTrigger id="botMode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="inquiries_only">استفسارات فقط</SelectItem>
+                    <SelectItem value="inquiries_sales">استفسارات + مبيعات</SelectItem>
+                    <SelectItem value="inquiries_sales_followup">استفسارات + مبيعات + متابعة (قريباً)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  يتحكم بسلوك البوت: هل يكتفي بالإجابة على الأسئلة، أم يكتشف نية الشراء ويرسل إشعاراً للمالك.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="ownerTg" className="flex items-center gap-2">
+                  <Send className="h-4 w-4" />
+                  معرّف محادثة المالك على تيليجرام
+                </Label>
+                <Input
+                  id="ownerTg"
+                  dir="ltr"
+                  value={ownerTelegramChatId}
+                  onChange={(e) => setOwnerTelegramChatId(e.target.value)}
+                  placeholder="123456789"
+                />
+                <p className="text-xs text-muted-foreground">
+                  عند اكتشاف نية شراء، سيرسل البوت ملخص الطلب على هذا المعرّف مع زر «تأكيد الطلب». يمكنك معرفة رقمك عبر @userinfobot.
+                </p>
+              </div>
             </div>
           </div>
         </TabsContent>
