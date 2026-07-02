@@ -240,6 +240,63 @@ Deno.serve(async (req) => {
     const update: TelegramUpdate = await req.json();
     console.log("Received Telegram update:", JSON.stringify(update));
 
+    // ---- Handle inline "Confirm Order" button ----
+    if (update.callback_query) {
+      const cb = update.callback_query;
+      const data = cb.data || "";
+      if (data.startsWith("confirm_order:")) {
+        const orderId = data.split(":")[1];
+        const { data: order } = await supabase
+          .from("pending_sale_orders")
+          .select("*")
+          .eq("id", orderId)
+          .maybeSingle();
+        if (order && (order as any).status === "pending") {
+          const chatbotForOrder = (channel as any).chatbots;
+          const confirmMsg =
+            "تم تأكيد طلبك ✅ سيتواصل معك أحد ممثلي المبيعات لإتمام العملية. شكراً لثقتك بنا!";
+          // Notify customer on their channel
+          if ((order as any).channel === "telegram") {
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: (order as any).customer_external_id, text: confirmMsg }),
+            });
+            await supabase.from("telegram_messages").insert({
+              telegram_user_id: Number((order as any).customer_external_id),
+              chatbot_id: chatbotForOrder.id,
+              role: "assistant",
+              content: confirmMsg,
+            });
+          }
+          await supabase
+            .from("pending_sale_orders")
+            .update({ status: "confirmed" })
+            .eq("id", orderId);
+          // Answer the callback + edit owner's message to reflect state
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "تم تأكيد الطلب" }),
+          });
+          if (cb.message) {
+            await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: cb.message.chat.id,
+                message_id: cb.message.message_id,
+                reply_markup: { inline_keyboard: [[{ text: "✅ تم التأكيد", callback_data: "noop" }]] },
+              }),
+            });
+          }
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (!update.message?.text) {
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -253,6 +310,55 @@ Deno.serve(async (req) => {
     const userMessage = update.message.text;
     const chatbot = channel.chatbots;
     const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+    // ---- Owner manual reply -> activate takeover for that customer ----
+    if (
+      chatbot.owner_telegram_chat_id &&
+      String(chatId) === String(chatbot.owner_telegram_chat_id) &&
+      update.message.reply_to_message
+    ) {
+      const { data: order } = await supabase
+        .from("pending_sale_orders")
+        .select("*")
+        .eq("owner_chat_id", String(chatId))
+        .eq("owner_message_id", update.message.reply_to_message.message_id)
+        .maybeSingle();
+      if (order) {
+        // Enable existing takeover on this customer's conversation
+        await supabase.from("conversation_takeovers").upsert(
+          {
+            chatbot_id: (order as any).chatbot_id,
+            channel: (order as any).channel,
+            external_id: (order as any).customer_external_id,
+            active: true,
+            last_human_at: new Date().toISOString(),
+            source: "telegram_owner",
+          },
+          { onConflict: "chatbot_id,channel,external_id" }
+        );
+        // Forward owner's reply to the customer
+        if ((order as any).channel === "telegram") {
+          await fetch(telegramApiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: (order as any).customer_external_id, text: userMessage }),
+          });
+          await supabase.from("telegram_messages").insert({
+            telegram_user_id: Number((order as any).customer_external_id),
+            chatbot_id: (order as any).chatbot_id,
+            role: "assistant",
+            content: userMessage,
+          });
+        }
+        await supabase
+          .from("pending_sale_orders")
+          .update({ status: "owner_replied" })
+          .eq("id", (order as any).id);
+        return new Response(JSON.stringify({ ok: true, takeover: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     // Register user (track new vs existing)
     const { isNew } = await getOrCreateUser(supabase, telegramUserId, chatbot.id, firstName, username);
