@@ -112,8 +112,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Detect sale intent via AI classifier
-    if (handover?.enabled) {
+    // Detect sale intent via AI classifier — gated by chatbot.bot_mode
+    const botMode: string = (chatbot as any).bot_mode || "inquiries_sales";
+    const salesEnabled = botMode === "inquiries_sales" || botMode === "inquiries_sales_followup";
+    if (handover?.enabled && salesEnabled) {
       try {
         const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
         const intentRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
