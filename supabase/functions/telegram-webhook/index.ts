@@ -34,35 +34,26 @@ function getDialectInstruction(dialect: string): string {
 async function generateAIResponse(
   userMessage: string,
   knowledgeContext: string,
-  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string },
-  conversationHistory: { role: string; content: string }[]
+  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string; welcome_message?: string },
+  conversationHistory: { role: string; content: string }[],
+  supabase: ReturnType<typeof createClient>
 ): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.error("LOVABLE_API_KEY not configured, using fallback");
+  // Unified LLM config from admin panel (single source of truth)
+  const { data: llmCfg } = await supabase
+    .from("llm_settings")
+    .select("model, custom_api_key")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const model = (llmCfg as any)?.model || "google/gemini-2.5-flash";
+  const apiKey = (llmCfg as any)?.custom_api_key || Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("No AI API key configured, using fallback");
     return chatbot.fallback_message;
   }
 
-  const customInstructions = chatbot.custom_instructions
-    ? `\n\nتعليمات إضافية من المالك:\n${chatbot.custom_instructions}`
-    : "";
-
-  const dialectInstruction = getDialectInstruction(chatbot.dialect || "formal");
-
-  const systemPrompt = `أنت مساعد ذكي اسمك "${chatbot.name}".
-نبرتك: ${chatbot.tone}
-اللغة: ${chatbot.language}${dialectInstruction}
-
-قاعدة المعرفة الخاصة بك:
-${knowledgeContext || "لا توجد معلومات في قاعدة المعرفة حالياً."}
-
-التعليمات:
-- أجب على أسئلة المستخدم بناءً على قاعدة المعرفة المتاحة فقط.
-- إذا لم تجد إجابة في قاعدة المعرفة، أجب بـ: "${chatbot.fallback_message}"
-- كن مختصراً ومفيداً.
-- لا تذكر أنك تستخدم "قاعدة معرفة" - تحدث بشكل طبيعي.
-- لا ترحب بالمستخدم ولا تقل "أهلاً" أو "مرحباً" في بداية كل رد. ادخل في الموضوع مباشرة.
-- لديك ذاكرة محادثة - استخدم السياق السابق للرد بشكل متسق وطبيعي.${customInstructions}`;
+  const systemPrompt = buildSystemPrompt(chatbot, knowledgeContext);
 
   const messages = [
     { role: "system", content: systemPrompt },
@@ -74,13 +65,10 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages,
-      }),
+      body: JSON.stringify({ model, messages, max_tokens: 1024 }),
     });
 
     if (!response.ok) {
@@ -94,6 +82,40 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
     console.error("AI call failed:", error);
     return chatbot.fallback_message;
   }
+}
+
+// Shared system prompt used by both Chat and Telegram (mirrors chat function behavior)
+function buildSystemPrompt(
+  chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string; welcome_message?: string },
+  knowledgeContext: string,
+): string {
+  const toneMap: Record<string, string> = {
+    professional: "احترافي ومهني",
+    friendly: "ودود ولطيف",
+    casual: "عفوي وبسيط",
+    formal: "رسمي ومحترم",
+  };
+  const dialectMap: Record<string, string> = {
+    palestinian: "اللهجة الفلسطينية العامية",
+    formal: "العربية الفصحى",
+  };
+  const toneDesc = toneMap[chatbot.tone] || chatbot.tone;
+  const dialectDesc = dialectMap[chatbot.dialect || "formal"] || "العربية الفصحى";
+
+  return `أنت مساعد ذكي اسمك "${chatbot.name}".
+اللغة: ${chatbot.language}
+اللهجة: ${dialectDesc}
+النبرة: ${toneDesc}
+
+${chatbot.custom_instructions ? `تعليمات خاصة: ${chatbot.custom_instructions}` : ""}
+
+${chatbot.welcome_message ? `رسالة الترحيب: ${chatbot.welcome_message}` : ""}
+
+إذا لم تتمكن من الإجابة من قاعدة المعرفة، استخدم هذه الرسالة: "${chatbot.fallback_message}"
+
+${knowledgeContext ? `\n# قاعدة المعرفة المتاحة:\n${knowledgeContext}` : "ليس لديك قاعدة معرفة حالياً. أجب بشكل عام ومفيد."}
+
+أجب بإيجاز ووضوح. لا ترحّب في كل رد، ادخل بالموضوع مباشرة. استخدم قاعدة المعرفة عند الإمكان.`;
 }
 
 async function getOrCreateUser(
