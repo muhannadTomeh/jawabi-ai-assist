@@ -54,6 +54,7 @@ export type Database = {
       }
       chatbots: {
         Row: {
+          bot_mode: string
           business_category: string | null
           business_description: string | null
           business_location: string | null
@@ -68,6 +69,7 @@ export type Database = {
           name: string
           onboarding_completed: boolean
           onboarding_step: number
+          owner_telegram_chat_id: string | null
           public_slug: string | null
           tone: string
           updated_at: string
@@ -75,6 +77,7 @@ export type Database = {
           welcome_message: string
         }
         Insert: {
+          bot_mode?: string
           business_category?: string | null
           business_description?: string | null
           business_location?: string | null
@@ -89,6 +92,7 @@ export type Database = {
           name: string
           onboarding_completed?: boolean
           onboarding_step?: number
+          owner_telegram_chat_id?: string | null
           public_slug?: string | null
           tone?: string
           updated_at?: string
@@ -96,6 +100,7 @@ export type Database = {
           welcome_message?: string
         }
         Update: {
+          bot_mode?: string
           business_category?: string | null
           business_description?: string | null
           business_location?: string | null
@@ -110,6 +115,7 @@ export type Database = {
           name?: string
           onboarding_completed?: boolean
           onboarding_step?: number
+          owner_telegram_chat_id?: string | null
           public_slug?: string | null
           tone?: string
           updated_at?: string
@@ -229,7 +235,6 @@ export type Database = {
           takeover_mode_enabled: boolean
           takeover_timeout_minutes: number
           trigger_keywords: string[]
-          trigger_on_low_confidence: boolean
           trigger_on_sale: boolean
           updated_at: string
         }
@@ -245,7 +250,6 @@ export type Database = {
           takeover_mode_enabled?: boolean
           takeover_timeout_minutes?: number
           trigger_keywords?: string[]
-          trigger_on_low_confidence?: boolean
           trigger_on_sale?: boolean
           updated_at?: string
         }
@@ -261,7 +265,6 @@ export type Database = {
           takeover_mode_enabled?: boolean
           takeover_timeout_minutes?: number
           trigger_keywords?: string[]
-          trigger_on_low_confidence?: boolean
           trigger_on_sale?: boolean
           updated_at?: string
         }
@@ -463,6 +466,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      pending_sale_orders: {
+        Row: {
+          channel: string
+          chatbot_id: string
+          created_at: string
+          customer_external_id: string
+          customer_name: string | null
+          id: string
+          owner_chat_id: string
+          owner_message_id: number | null
+          status: string
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          chatbot_id: string
+          created_at?: string
+          customer_external_id: string
+          customer_name?: string | null
+          id?: string
+          owner_chat_id: string
+          owner_message_id?: number | null
+          status?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          chatbot_id?: string
+          created_at?: string
+          customer_external_id?: string
+          customer_name?: string | null
+          id?: string
+          owner_chat_id?: string
+          owner_message_id?: number | null
+          status?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_sale_orders_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
