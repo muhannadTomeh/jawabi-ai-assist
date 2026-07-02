@@ -479,13 +479,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Sale-intent detection
-    if (handover?.enabled) {
+    // Sale-intent detection — gated by bot_mode
+    const botMode: string = (chatbot as any).bot_mode || "inquiries_sales";
+    const salesEnabled = botMode === "inquiries_sales" || botMode === "inquiries_sales_followup";
+    if (salesEnabled) {
       try {
-        const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+        const { data: llmCfg } = await supabase
+          .from("llm_settings")
+          .select("model, custom_api_key")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const intentApiKey = (llmCfg as any)?.custom_api_key || Deno.env.get("LOVABLE_API_KEY");
         const intentRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableApiKey}` },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${intentApiKey}` },
           body: JSON.stringify({
             model: "google/gemini-2.5-flash-lite",
             messages: [
@@ -503,19 +511,56 @@ Deno.serve(async (req) => {
           const intentData = await intentRes.json();
           const intent = (intentData.choices?.[0]?.message?.content || "").toLowerCase().trim();
           if (intent.includes("sale")) {
-            const saleMsg = handover.sale_message || "سأقوم بتحويلك إلى موظف المبيعات.";
-            await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, saleMsg);
-            if (handover.trigger_on_sale === true) {
-              await createNotification("sale", "طلب شراء");
+            // Send order summary to owner on Telegram with an inline confirm button.
+            const ownerChatId = (chatbot as any).owner_telegram_chat_id;
+            if (ownerChatId) {
+              const { data: order } = await supabase
+                .from("pending_sale_orders")
+                .insert({
+                  chatbot_id: chatbot.id,
+                  channel: "telegram",
+                  customer_external_id: String(telegramUserId),
+                  customer_name: firstName || username || null,
+                  summary: userMessage,
+                  owner_chat_id: String(ownerChatId),
+                })
+                .select()
+                .single();
+
+              const summaryText =
+                `🛒 طلب شراء جديد\n` +
+                `العميل: ${firstName || "غير معروف"}${username ? " (@" + username + ")" : ""}\n` +
+                `القناة: تيليجرام\n` +
+                `الرسالة: ${userMessage}\n\n` +
+                `اضغط «تأكيد الطلب» لإرسال تأكيد للعميل، أو رد على هذه الرسالة للتواصل يدوياً (سيتوقف البوت تلقائياً).`;
+
+              const ownerRes = await fetch(telegramApiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: ownerChatId,
+                  text: summaryText,
+                  reply_markup: {
+                    inline_keyboard: [[
+                      { text: "✅ تأكيد الطلب", callback_data: `confirm_order:${(order as any)?.id}` },
+                    ]],
+                  },
+                }),
+              });
+              if (ownerRes.ok && order) {
+                const rj = await ownerRes.json();
+                await supabase
+                  .from("pending_sale_orders")
+                  .update({ owner_message_id: rj?.result?.message_id })
+                  .eq("id", (order as any).id);
+              } else if (!ownerRes.ok) {
+                console.error("Failed to notify owner:", await ownerRes.text());
+              }
+            } else {
+              console.warn("Sale intent detected but owner_telegram_chat_id not configured");
             }
-            await fetch(telegramApiUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ chat_id: chatId, text: saleMsg }),
-            });
-            return new Response(JSON.stringify({ ok: true }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            // Do NOT auto-confirm to the customer. Let the AI respond normally,
+            // continuing to collect info until the owner presses Confirm.
           }
         }
       } catch (e) {
