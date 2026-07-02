@@ -291,19 +291,6 @@ export default function SettingsPage() {
             </div>
 
             <div className={handoverEnabled ? 'space-y-6' : 'pointer-events-none opacity-50 space-y-6'}>
-              <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                <div>
-                  <p className="font-medium text-foreground">التحويل عند انخفاض الثقة</p>
-                  <p className="text-sm text-muted-foreground">
-                    تحويل المحادثة عندما يكون البوت غير متأكد من الرد
-                  </p>
-                </div>
-                <Switch
-                  checked={lowConfidence}
-                  onCheckedChange={setLowConfidence}
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="keywords">كلمات التحويل</Label>
                 <Input
