@@ -175,12 +175,14 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token && challenge) {
-      const { data: channel } = await supabase
+      const { data: channels } = await supabase
         .from("channels")
         .select("*")
-        .eq("platform", "whatsapp")
-        .filter("config->verify_token", "eq", token)
-        .maybeSingle();
+        .eq("platform", "whatsapp");
+
+      const channel = channels?.find(
+        (c: any) => c.config?.verify_token === token
+      );
 
       if (channel) {
         console.log("WhatsApp webhook verified for channel:", channel.id);
