@@ -25,32 +25,58 @@ export default function AnalyticsPage() {
     async function fetchAnalytics() {
       setLoading(true);
       try {
-        // Fetch all telegram messages for this chatbot
-        const { data: messages, error: msgError } = await supabase
-          .from('telegram_messages')
-          .select('*')
-          .eq('chatbot_id', chatbot!.id);
-
-        if (msgError) throw msgError;
-
-        // Fetch connected channels
-        const { data: channels, error: chError } = await supabase
+        // Fetch messages from all channels in parallel
+        const [tgRes, waRes, msgRes, chRes] = await Promise.all([
+          supabase
+            .from('telegram_messages')
+            .select('role, created_at, telegram_user_id')
+            .eq('chatbot_id', chatbot!.id),
+          supabase
+            .from('whatsapp_messages')
+            .select('role, created_at, phone_number')
+            .eq('chatbot_id', chatbot!.id),
+          supabase
+            .from('messenger_messages')
+            .select('role, created_at, sender_id')
+            .eq('chatbot_id', chatbot!.id),
+          supabase
           .from('channels')
           .select('*')
           .eq('chatbot_id', chatbot!.id)
-          .eq('is_connected', true);
+            .eq('is_connected', true),
+        ]);
 
-        if (chError) throw chError;
+        if (tgRes.error) throw tgRes.error;
+        if (waRes.error) throw waRes.error;
+        if (msgRes.error) throw msgRes.error;
+        if (chRes.error) throw chRes.error;
 
-        setChannelCount(channels?.length || 0);
+        setChannelCount(chRes.data?.length || 0);
 
-        const allMessages = messages || [];
+        type Unified = { role: string; created_at: string; userKey: string };
+        const allMessages: Unified[] = [
+          ...((tgRes.data || []) as any[]).map((m) => ({
+            role: m.role,
+            created_at: m.created_at,
+            userKey: `tg:${m.telegram_user_id}`,
+          })),
+          ...((waRes.data || []) as any[]).map((m) => ({
+            role: m.role,
+            created_at: m.created_at,
+            userKey: `wa:${m.phone_number}`,
+          })),
+          ...((msgRes.data || []) as any[]).map((m) => ({
+            role: m.role,
+            created_at: m.created_at,
+            userKey: `ms:${m.sender_id}`,
+          })),
+        ];
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const weekStart = new Date(todayStart);
         weekStart.setDate(weekStart.getDate() - 7);
 
-        const uniqueUserIds = new Set(allMessages.map((m) => m.telegram_user_id));
+        const uniqueUserIds = new Set(allMessages.map((m) => m.userKey));
 
         setAnalytics({
           totalMessages: allMessages.length,

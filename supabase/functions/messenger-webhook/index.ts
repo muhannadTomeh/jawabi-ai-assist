@@ -247,14 +247,16 @@ Deno.serve(async (req) => {
         chatbot = socialConn.chatbots;
         pageAccessToken = socialConn.access_token;
       } else {
-        // Fallback to legacy channels table
-        const { data: channel } = await supabase
+        // Fallback to legacy channels table (filter JSONB in JS)
+        const { data: legacyChannels } = await supabase
           .from("channels")
           .select("*, chatbots(*)")
           .eq("platform", "messenger")
-          .eq("is_connected", true)
-          .filter("config->page_id", "eq", pageId)
-          .maybeSingle();
+          .eq("is_connected", true);
+
+        const channel = legacyChannels?.find(
+          (c: any) => c.config?.page_id === pageId
+        );
 
         if (channel) {
           chatbot = channel.chatbots;
