@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://uatmgqwqdnqlwpyduhwn.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "jawabi-mcp",
+      "version": "0.1.0",
+      "title": "Jawabi MCP"
+    },
+    "tools": [
+      {
+        "name": "get_my_chatbot",
+        "title": "Get my chatbot",
+        "description": "Return the signed-in user's Jawabi chatbot: name, language, dialect, tone, welcome and fallback messages, custom instructions, business fields, bot_mode, and active status.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_knowledge_items",
+        "title": "List knowledge base items",
+        "description": "List knowledge base entries (text, FAQ, files, URLs, social, images) for the signed-in user's chatbot. Optionally filter by type.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "text",
+                "faq",
+                "file",
+                "url",
+                "social",
+                "image"
+              ],
+              "description": "Filter by knowledge item type."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Max rows to return (default 50)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "add_faq",
+        "title": "Add FAQ",
+        "description": "Add a question/answer pair to the signed-in user's chatbot knowledge base. Use for teaching the bot specific answers.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Short title/label for this FAQ."
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The customer question."
+            },
+            "answer": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The answer the bot should give."
+            }
+          },
+          "required": [
+            "title",
+            "question",
+            "answer"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "add_text_knowledge",
+        "title": "Add text knowledge",
+        "description": "Add a free-form text passage (business info, policy, product description) to the signed-in user's chatbot knowledge base.",
+        "annotations": {
+          "readOnlyHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Short title/label for this passage."
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The text content the bot should learn."
+            }
+          },
+          "required": [
+            "title",
+            "content"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_notifications",
+        "title": "List recent notifications",
+        "description": "List recent notifications (sale intents, human-handover requests, unclear questions) for the signed-in user's chatbot.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Max rows (default 20)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_chatbot_settings",
+        "title": "Update chatbot settings",
+        "description": "Update the signed-in user's chatbot persona and behavior: name, tone, dialect, welcome/fallback messages, custom instructions, and bot_mode.",
+        "annotations": {
+          "readOnlyHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tone": {
+              "type": "string",
+              "enum": [
+                "professional",
+                "friendly",
+                "casual",
+                "formal"
+              ]
+            },
+            "dialect": {
+              "type": "string",
+              "enum": [
+                "palestinian",
+                "formal"
+              ]
+            },
+            "welcome_message": {
+              "type": "string"
+            },
+            "fallback_message": {
+              "type": "string"
+            },
+            "custom_instructions": {
+              "type": "string"
+            },
+            "bot_mode": {
+              "type": "string",
+              "enum": [
+                "inquiries_only",
+                "inquiries_sales",
+                "inquiries_sales_followup"
+              ]
+            },
+            "is_active": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
