@@ -24,7 +24,6 @@ export default defineTool({
     answer: z.string().trim().min(1).describe("The answer the bot should give."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  needsApproval: true,
   handler: async ({ title, question, answer }, ctx) => {
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
