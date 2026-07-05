@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,10 @@ import { lovable } from '@/integrations/lovable';
 export default function AuthPage() {
   const { user, loading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawNext = searchParams.get('next') || '';
+  const nextPath =
+    rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/onboarding';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
 
@@ -43,7 +47,7 @@ export default function AuthPage() {
   }
 
   if (user) {
-    return <Navigate to="/onboarding" replace />;
+    return <Navigate to={nextPath} replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -101,7 +105,10 @@ export default function AuthPage() {
     try {
       sessionStorage.setItem('oauth_pending', provider);
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: window.location.origin + '/auth',
+        redirect_uri:
+          window.location.origin +
+          '/auth' +
+          (rawNext ? `?next=${encodeURIComponent(nextPath)}` : ''),
       });
       if (result.error) {
         toast.error('فشل تسجيل الدخول', { description: result.error.message });
