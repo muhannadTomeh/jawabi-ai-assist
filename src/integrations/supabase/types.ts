@@ -285,6 +285,7 @@ export type Database = {
           chatbot_id: string
           content: string | null
           created_at: string
+          embedding: string | null
           file_name: string | null
           file_url: string | null
           id: string
@@ -300,6 +301,7 @@ export type Database = {
           chatbot_id: string
           content?: string | null
           created_at?: string
+          embedding?: string | null
           file_name?: string | null
           file_url?: string | null
           id?: string
@@ -315,6 +317,7 @@ export type Database = {
           chatbot_id?: string
           content?: string | null
           created_at?: string
+          embedding?: string | null
           file_name?: string | null
           file_url?: string | null
           id?: string
@@ -816,6 +819,23 @@ export type Database = {
         Returns: boolean
       }
       is_chatbot_owner: { Args: { chatbot_id: string }; Returns: boolean }
+      match_knowledge_items: {
+        Args: {
+          match_count?: number
+          p_chatbot_id: string
+          query_embedding: string
+        }
+        Returns: {
+          answer: string
+          content: string
+          file_url: string
+          id: string
+          question: string
+          similarity: number
+          title: string
+          type: string
+        }[]
+      }
       record_customer_contact: {
         Args: {
           _channel: string
