@@ -86,11 +86,21 @@ async function generateAIResponse(
   knowledgeContext: string,
   chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string },
   conversationHistory: { role: string; content: string }[],
-  senderName?: string
+  senderName: string | undefined,
+  supabase: ReturnType<typeof createClient>
 ): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.error("LOVABLE_API_KEY not configured, using fallback");
+  // Unified LLM config from admin panel (single source of truth)
+  const { data: llmCfg } = await supabase
+    .from("llm_settings")
+    .select("model, custom_api_key")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const model = (llmCfg as any)?.model || "google/gemini-2.5-flash";
+  const apiKey = (llmCfg as any)?.custom_api_key || Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("No AI API key configured, using fallback");
     return chatbot.fallback_message;
   }
 
@@ -134,11 +144,11 @@ ${knowledgeContext ? `قاعدة المعرفة:\n${knowledgeContext}` : ""}
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages,
       }),
     });
