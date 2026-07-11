@@ -167,8 +167,30 @@ Deno.serve(async (req) => {
     }
 
     // Build knowledge context
+    // Try semantic retrieval first (RAG) — falls back to dumping everything
+    // when no rows have embeddings yet (e.g. OPENAI_API_KEY missing).
+    let retrievedItems: any[] | null = null;
+    try {
+      const embRes = await supabase.functions.invoke("generate-embedding", {
+        body: { text: message },
+      });
+      const embedding = (embRes.data as any)?.embedding;
+      if (Array.isArray(embedding)) {
+        const { data: matches } = await supabase.rpc("match_knowledge_items", {
+          p_chatbot_id: chatbot_id,
+          query_embedding: embedding,
+          match_count: 5,
+        });
+        if (matches && matches.length > 0) retrievedItems = matches as any[];
+      }
+    } catch (e) {
+      console.error("Semantic retrieval failed, falling back:", e);
+    }
+
+    const itemsForContext = retrievedItems ?? knowledgeItems ?? [];
+
     let knowledgeContext = "";
-    if (knowledgeItems && knowledgeItems.length > 0) {
+    if (itemsForContext && itemsForContext.length > 0) {
       const faqItems = knowledgeItems
         .filter((item) => item.type === "faq" && item.question && item.answer)
         .map((item) => `سؤال: ${item.question}\nجواب: ${item.answer}`)
