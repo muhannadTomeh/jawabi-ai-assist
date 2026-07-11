@@ -250,35 +250,18 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Build knowledge context once for all messages
-        const { data: knowledgeItems } = await supabase
+        // Fetch all knowledge items once (fallback source)
+        const { data: allKnowledgeItems } = await supabase
           .from("knowledge_items")
           .select("*")
           .eq("chatbot_id", chatbot.id);
 
-        let knowledgeContext = "";
-        if (knowledgeItems && knowledgeItems.length > 0) {
-          const faqs = knowledgeItems
-            .filter((i) => i.type === "faq" && i.question && i.answer)
-            .map((i) => `سؤال: ${i.question}\nجواب: ${i.answer}`)
-            .join("\n\n");
-          const texts = knowledgeItems
-            .filter((i) => i.type === "text" && i.content)
-            .map((i) => `${i.title}: ${i.content}`)
-            .join("\n\n");
-          const images = knowledgeItems
-            .filter((i) => i.type === "image" && i.file_url)
-            .map(
-              (i) =>
-                `صورة بعنوان "${i.title}":\nالوصف: ${i.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${i.file_url}]`
-            )
-            .join("\n\n");
-          if (faqs) knowledgeContext += faqs + "\n\n";
-          if (texts) knowledgeContext += texts;
-          if (images) {
-            knowledgeContext += `\n\n## الصور المتاحة:\n${images}\n\nعندما يطلب المستخدم رؤية صورة أو حين تكون الصورة هي أفضل إجابة، أرسلها بإضافة [IMAGE:<الرابط>] في ردك تماماً كما هي، ولا تخترع روابط.`;
-          }
-        }
+        // Fetch handover settings once
+        const { data: handover } = await supabase
+          .from("handover_settings")
+          .select("*")
+          .eq("chatbot_id", chatbot.id)
+          .maybeSingle();
 
         for (const message of value.messages) {
           if (message.type !== "text" || !message.text?.body) continue;
@@ -301,8 +284,85 @@ Deno.serve(async (req) => {
             _last_message: userMessage,
           });
 
+          // Human takeover: if a human recently intervened, stay silent.
+          if (handover?.takeover_mode_enabled) {
+            const { data: takeover } = await supabase
+              .from("conversation_takeovers")
+              .select("active,last_human_at")
+              .eq("chatbot_id", chatbot.id)
+              .eq("channel", "whatsapp")
+              .eq("external_id", senderPhone)
+              .maybeSingle();
+            if (takeover?.active) {
+              const timeoutMin = handover.takeover_timeout_minutes || 60;
+              const lastHuman = new Date(takeover.last_human_at as string).getTime();
+              const stillActive = Date.now() - lastHuman < timeoutMin * 60 * 1000;
+              if (stillActive) {
+                await supabase.from("whatsapp_messages").insert({
+                  chatbot_id: chatbot.id,
+                  phone_number: senderPhone,
+                  role: "user",
+                  content: userMessage,
+                });
+                console.log("Skipping WhatsApp reply: human takeover active for", senderPhone);
+                continue;
+              } else {
+                await supabase
+                  .from("conversation_takeovers")
+                  .update({ active: false })
+                  .eq("chatbot_id", chatbot.id)
+                  .eq("channel", "whatsapp")
+                  .eq("external_id", senderPhone);
+              }
+            }
+          }
+
           // Get conversation history for this sender
           const history = await getConversationHistory(supabase, chatbot.id, senderPhone, 10);
+
+          // Semantic retrieval with fallback to the full dump.
+          let retrievedItems: any[] | null = null;
+          try {
+            const embRes = await supabase.functions.invoke("generate-embedding", {
+              body: { text: userMessage },
+            });
+            const embedding = (embRes.data as any)?.embedding;
+            if (Array.isArray(embedding)) {
+              const { data: matches } = await supabase.rpc("match_knowledge_items", {
+                p_chatbot_id: chatbot.id,
+                query_embedding: embedding,
+                match_count: 5,
+              });
+              if (matches && matches.length > 0) retrievedItems = matches as any[];
+            }
+          } catch (e) {
+            console.error("Semantic retrieval failed, falling back:", e);
+          }
+          const knowledgeItems = retrievedItems ?? allKnowledgeItems;
+
+          let knowledgeContext = "";
+          if (knowledgeItems && knowledgeItems.length > 0) {
+            const faqs = knowledgeItems
+              .filter((i: any) => i.type === "faq" && i.question && i.answer)
+              .map((i: any) => `سؤال: ${i.question}\nجواب: ${i.answer}`)
+              .join("\n\n");
+            const texts = knowledgeItems
+              .filter((i: any) => i.type === "text" && i.content)
+              .map((i: any) => `${i.title}: ${i.content}`)
+              .join("\n\n");
+            const images = knowledgeItems
+              .filter((i: any) => i.type === "image" && i.file_url)
+              .map(
+                (i: any) =>
+                  `صورة بعنوان "${i.title}":\nالوصف: ${i.content || "بدون وصف"}\nرابط الإرسال: [IMAGE:${i.file_url}]`
+              )
+              .join("\n\n");
+            if (faqs) knowledgeContext += faqs + "\n\n";
+            if (texts) knowledgeContext += texts;
+            if (images) {
+              knowledgeContext += `\n\n## الصور المتاحة:\n${images}\n\nعندما يطلب المستخدم رؤية صورة أو حين تكون الصورة هي أفضل إجابة، أرسلها بإضافة [IMAGE:<الرابط>] في ردك تماماً كما هي، ولا تخترع روابط.`;
+            }
+          }
 
           // Generate AI response with history and sender name
           const responseText = await generateAIResponse(
@@ -310,7 +370,8 @@ Deno.serve(async (req) => {
             knowledgeContext,
             chatbot,
             history,
-            senderName
+            senderName,
+            supabase
           );
 
           // Save messages to database
