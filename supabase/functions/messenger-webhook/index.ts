@@ -436,10 +436,30 @@ Deno.serve(async (req) => {
         }
 
         // Build knowledge context
-        const { data: knowledgeItems } = await supabase
+        const { data: allKnowledgeItems } = await supabase
           .from("knowledge_items")
           .select("*")
           .eq("chatbot_id", chatbot.id);
+
+        // Semantic retrieval with fallback to the full dump.
+        let retrievedItems: any[] | null = null;
+        try {
+          const embRes = await supabase.functions.invoke("generate-embedding", {
+            body: { text: userMessage },
+          });
+          const embedding = (embRes.data as any)?.embedding;
+          if (Array.isArray(embedding)) {
+            const { data: matches } = await supabase.rpc("match_knowledge_items", {
+              p_chatbot_id: chatbot.id,
+              query_embedding: embedding,
+              match_count: 5,
+            });
+            if (matches && matches.length > 0) retrievedItems = matches as any[];
+          }
+        } catch (e) {
+          console.error("Semantic retrieval failed, falling back:", e);
+        }
+        const knowledgeItems = retrievedItems ?? allKnowledgeItems;
 
         let knowledgeContext = "";
         if (knowledgeItems && knowledgeItems.length > 0) {
@@ -462,7 +482,7 @@ Deno.serve(async (req) => {
         }
 
         // Generate AI response
-        let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
+        let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory, supabase);
 
         // Failed-responses handover
         if (handover?.enabled && responseText.trim() === (chatbot.fallback_message || "").trim()) {
