@@ -191,19 +191,19 @@ Deno.serve(async (req) => {
 
     let knowledgeContext = "";
     if (itemsForContext && itemsForContext.length > 0) {
-      const faqItems = knowledgeItems
+      const faqItems = itemsForContext
         .filter((item) => item.type === "faq" && item.question && item.answer)
         .map((item) => `سؤال: ${item.question}\nجواب: ${item.answer}`)
         .join("\n\n");
 
-      const textItems = knowledgeItems
+      const textItems = itemsForContext
         .filter((item) => (item.type === "text" || item.type === "url" || item.type === "social") && item.content)
         .map((item) => (item.type === "url" || item.type === "social") && item.file_url
           ? `${item.title} (المصدر: ${item.file_url}):\n${item.content}`
           : `${item.title}: ${item.content}`)
         .join("\n\n");
 
-      const imageItems = knowledgeItems
+      const imageItems = itemsForContext
         .filter((item) => item.type === "image" && item.file_url)
         .map(
           (item) =>
