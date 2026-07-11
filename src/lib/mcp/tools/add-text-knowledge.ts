@@ -40,6 +40,19 @@ export default defineTool({
       .select()
       .single();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    try {
+      await fetch(`${process.env.SUPABASE_URL}/functions/v1/generate-embedding`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ctx.getToken()}`,
+          apikey: process.env.SUPABASE_PUBLISHABLE_KEY!,
+        },
+        body: JSON.stringify({ item_id: data.id }),
+      });
+    } catch (e) {
+      console.warn("embedding trigger failed:", e);
+    }
     return {
       content: [{ type: "text", text: `Text knowledge added (id: ${data.id}).` }],
       structuredContent: { item: data },
