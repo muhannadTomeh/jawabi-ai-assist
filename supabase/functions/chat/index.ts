@@ -167,21 +167,43 @@ Deno.serve(async (req) => {
     }
 
     // Build knowledge context
+    // Try semantic retrieval first (RAG) — falls back to dumping everything
+    // when no rows have embeddings yet (e.g. OPENAI_API_KEY missing).
+    let retrievedItems: any[] | null = null;
+    try {
+      const embRes = await supabase.functions.invoke("generate-embedding", {
+        body: { text: message },
+      });
+      const embedding = (embRes.data as any)?.embedding;
+      if (Array.isArray(embedding)) {
+        const { data: matches } = await supabase.rpc("match_knowledge_items", {
+          p_chatbot_id: chatbot_id,
+          query_embedding: embedding,
+          match_count: 5,
+        });
+        if (matches && matches.length > 0) retrievedItems = matches as any[];
+      }
+    } catch (e) {
+      console.error("Semantic retrieval failed, falling back:", e);
+    }
+
+    const itemsForContext = retrievedItems ?? knowledgeItems ?? [];
+
     let knowledgeContext = "";
-    if (knowledgeItems && knowledgeItems.length > 0) {
-      const faqItems = knowledgeItems
+    if (itemsForContext && itemsForContext.length > 0) {
+      const faqItems = itemsForContext
         .filter((item) => item.type === "faq" && item.question && item.answer)
         .map((item) => `سؤال: ${item.question}\nجواب: ${item.answer}`)
         .join("\n\n");
 
-      const textItems = knowledgeItems
+      const textItems = itemsForContext
         .filter((item) => (item.type === "text" || item.type === "url" || item.type === "social") && item.content)
         .map((item) => (item.type === "url" || item.type === "social") && item.file_url
           ? `${item.title} (المصدر: ${item.file_url}):\n${item.content}`
           : `${item.title}: ${item.content}`)
         .join("\n\n");
 
-      const imageItems = knowledgeItems
+      const imageItems = itemsForContext
         .filter((item) => item.type === "image" && item.file_url)
         .map(
           (item) =>

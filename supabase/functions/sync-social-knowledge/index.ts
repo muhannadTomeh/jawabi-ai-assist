@@ -133,6 +133,22 @@ Deno.serve(async (req) => {
     }));
     const { error: insErr } = await admin.from("knowledge_items").insert(rows);
     results.push({ connectionId, inserted: insErr ? 0 : rows.length, error: insErr?.message });
+
+    // Trigger embedding backfill for this chatbot's newly inserted rows.
+    if (!insErr) {
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-embedding`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ backfill: true, chatbot_id: conn.chatbot_id }),
+        });
+      } catch (e) {
+        console.warn("Embedding backfill trigger failed:", e);
+      }
+    }
   }
 
   return json({ success: true, processed: results.length, results });

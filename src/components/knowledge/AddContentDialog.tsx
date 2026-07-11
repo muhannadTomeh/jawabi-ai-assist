@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Link as RouterLink } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { embedKnowledgeItem } from '@/lib/knowledgeEmbedding';
 
 interface AddContentDialogProps {
   open: boolean;
@@ -87,14 +88,15 @@ export function AddContentDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('knowledge_items').insert({
+      const { data: inserted, error } = await supabase.from('knowledge_items').insert({
         chatbot_id: chatbotId,
         type: 'text',
         title: textTitle.trim(),
         content: textContent.trim(),
-      });
+      }).select('id').single();
 
       if (error) throw error;
+      if (inserted?.id) void embedKnowledgeItem(inserted.id);
 
       toast({
         title: 'تمت الإضافة بنجاح',
@@ -120,15 +122,16 @@ export function AddContentDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('knowledge_items').insert({
+      const { data: inserted, error } = await supabase.from('knowledge_items').insert({
         chatbot_id: chatbotId,
         type: 'faq',
         title: faqTitle.trim(),
         question: faqQuestion.trim(),
         answer: faqAnswer.trim(),
-      });
+      }).select('id').single();
 
       if (error) throw error;
+      if (inserted?.id) void embedKnowledgeItem(inserted.id);
 
       toast({
         title: 'تمت الإضافة بنجاح',

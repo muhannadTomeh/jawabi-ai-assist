@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Upload, File, X, Loader2, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { embedKnowledgeItem } from '@/lib/knowledgeEmbedding';
 
 interface FileUploadDialogProps {
   open: boolean;
@@ -147,15 +148,16 @@ export function FileUploadDialog({
         ? [description.trim(), analyzedDescription].filter(Boolean).join('\n\n---\nتحليل تلقائي للصورة:\n')
         : null;
 
-      const { error: dbError } = await supabase.from('knowledge_items').insert({
+      const { data: inserted, error: dbError } = await supabase.from('knowledge_items').insert({
         chatbot_id: chatbotId,
         type: isImage ? 'image' : 'file',
         title: title.trim(),
         file_name: file.name,
         file_url: storedUrl,
         content: combinedContent,
-      });
+      }).select('id').single();
       if (dbError) throw dbError;
+      if (inserted?.id) void embedKnowledgeItem(inserted.id);
 
       toast({
         title: isImage ? 'تم رفع الصورة وتحليلها' : 'تم رفع الملف بنجاح',

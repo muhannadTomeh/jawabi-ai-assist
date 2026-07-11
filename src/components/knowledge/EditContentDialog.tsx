@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { embedKnowledgeItem } from '@/lib/knowledgeEmbedding';
 
 interface KnowledgeItem {
   id: string;
@@ -78,6 +79,7 @@ export function EditContentDialog({
         .eq('id', item.id);
 
       if (error) throw error;
+      void embedKnowledgeItem(item.id);
 
       toast({
         title: 'تم التعديل',

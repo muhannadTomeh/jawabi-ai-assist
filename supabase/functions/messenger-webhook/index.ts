@@ -38,10 +38,23 @@ async function generateAIResponse(
   userMessage: string,
   knowledgeContext: string,
   chatbot: { name: string; tone: string; language: string; fallback_message: string; custom_instructions: string; dialect: string },
-  conversationHistory: { role: string; content: string }[]
+  conversationHistory: { role: string; content: string }[],
+  supabase: ReturnType<typeof createClient>
 ): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return chatbot.fallback_message;
+  // Unified LLM config from admin panel (single source of truth)
+  const { data: llmCfg } = await supabase
+    .from("llm_settings")
+    .select("model, custom_api_key")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const model = (llmCfg as any)?.model || "google/gemini-2.5-flash";
+  const apiKey = (llmCfg as any)?.custom_api_key || Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("No AI API key configured, using fallback");
+    return chatbot.fallback_message;
+  }
 
   const customInstructions = chatbot.custom_instructions
     ? `\n\nتعليمات إضافية من المالك:\n${chatbot.custom_instructions}`
@@ -72,8 +85,8 @@ ${knowledgeContext || "لا توجد معلومات في قاعدة المعرف
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages }),
     });
     if (!response.ok) {
       console.error("AI gateway error:", response.status, await response.text());
@@ -423,10 +436,30 @@ Deno.serve(async (req) => {
         }
 
         // Build knowledge context
-        const { data: knowledgeItems } = await supabase
+        const { data: allKnowledgeItems } = await supabase
           .from("knowledge_items")
           .select("*")
           .eq("chatbot_id", chatbot.id);
+
+        // Semantic retrieval with fallback to the full dump.
+        let retrievedItems: any[] | null = null;
+        try {
+          const embRes = await supabase.functions.invoke("generate-embedding", {
+            body: { text: userMessage },
+          });
+          const embedding = (embRes.data as any)?.embedding;
+          if (Array.isArray(embedding)) {
+            const { data: matches } = await supabase.rpc("match_knowledge_items", {
+              p_chatbot_id: chatbot.id,
+              query_embedding: embedding,
+              match_count: 5,
+            });
+            if (matches && matches.length > 0) retrievedItems = matches as any[];
+          }
+        } catch (e) {
+          console.error("Semantic retrieval failed, falling back:", e);
+        }
+        const knowledgeItems = retrievedItems ?? allKnowledgeItems;
 
         let knowledgeContext = "";
         if (knowledgeItems && knowledgeItems.length > 0) {
@@ -449,7 +482,7 @@ Deno.serve(async (req) => {
         }
 
         // Generate AI response
-        let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory);
+        let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory, supabase);
 
         // Failed-responses handover
         if (handover?.enabled && responseText.trim() === (chatbot.fallback_message || "").trim()) {
