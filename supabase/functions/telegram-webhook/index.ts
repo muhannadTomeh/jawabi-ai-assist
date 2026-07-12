@@ -310,6 +310,20 @@ Deno.serve(async (req) => {
     const userMessage = update.message.text;
     const chatbot = channel.chatbots;
     const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const telegramChatActionUrl = `https://api.telegram.org/bot${botToken}/sendChatAction`;
+    let lockAcquired = false;
+    const releaseLock = async () => {
+      if (!lockAcquired) return;
+      lockAcquired = false;
+      try {
+        await supabase.rpc("release_conversation_lock", {
+          p_chatbot_id: chatbot.id,
+          p_external_id: String(telegramUserId),
+        });
+      } catch (e) {
+        console.error("release_conversation_lock failed:", e);
+      }
+    };
 
     // ---- Owner manual reply -> activate takeover for that customer ----
     if (
@@ -398,6 +412,18 @@ Deno.serve(async (req) => {
     }
 
     // Get conversation history
+    // Serialize concurrent messages from the same user+chatbot so we don't
+    // interleave AI replies when messages arrive within a few seconds.
+    try {
+      const { data: gotLock } = await supabase.rpc("acquire_conversation_lock", {
+        p_chatbot_id: chatbot.id,
+        p_external_id: String(telegramUserId),
+      });
+      lockAcquired = gotLock !== false;
+    } catch (e) {
+      console.error("acquire_conversation_lock failed:", e);
+    }
+
     const conversationHistory = await getConversationHistory(supabase, telegramUserId, chatbot.id);
 
     // Fetch handover settings
@@ -623,6 +649,17 @@ Deno.serve(async (req) => {
     }
 
     // Generate AI response with conversation history (unified LLM settings from admin)
+    // Show typing indicator to the user for a more human feel.
+    try {
+      await fetch(telegramChatActionUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, action: "typing" }),
+      });
+    } catch (e) {
+      console.error("Telegram sendChatAction failed:", e);
+    }
+
     let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory, supabase);
 
     // Unclear-question handover (consecutive fallback responses)
@@ -646,6 +683,7 @@ Deno.serve(async (req) => {
 
     // Save messages
     await saveMessages(supabase, telegramUserId, chatbot.id, userMessage, responseText);
+    await releaseLock();
 
     // Parse [IMAGE:url] tokens and send images + remaining text
     const imageRegex = /\[IMAGE:(https?:\/\/[^\s\]]+)\]/g;
@@ -680,6 +718,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("Error processing webhook:", error);
+    try { await releaseLock(); } catch (_) { /* ignore */ }
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
