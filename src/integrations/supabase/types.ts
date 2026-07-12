@@ -124,6 +124,24 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_locks: {
+        Row: {
+          chatbot_id: string
+          external_id: string
+          locked_at: string
+        }
+        Insert: {
+          chatbot_id: string
+          external_id: string
+          locked_at?: string
+        }
+        Update: {
+          chatbot_id?: string
+          external_id?: string
+          locked_at?: string
+        }
+        Relationships: []
+      }
       conversation_takeovers: {
         Row: {
           active: boolean
@@ -801,6 +819,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_conversation_lock: {
+        Args: {
+          p_chatbot_id: string
+          p_external_id: string
+          p_stale_seconds?: number
+          p_timeout_ms?: number
+        }
+        Returns: boolean
+      }
       get_chatbot_by_slug: {
         Args: { _slug: string }
         Returns: {
@@ -847,6 +874,10 @@ export type Database = {
           _username?: string
         }
         Returns: string
+      }
+      release_conversation_lock: {
+        Args: { p_chatbot_id: string; p_external_id: string }
+        Returns: undefined
       }
     }
     Enums: {
