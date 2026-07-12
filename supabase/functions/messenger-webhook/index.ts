@@ -105,14 +105,17 @@ async function getOrCreateMessengerUser(
   chatbotId: string,
   messengerUserId: string
 ): Promise<{ isNew: boolean }> {
-  const { data: existing } = await supabase
+  // Atomic insert: rely on the UNIQUE(chatbot_id, messenger_user_id) constraint
+  // to distinguish new vs. returning users, avoiding a select-then-insert race.
+  const { error } = await supabase
     .from("messenger_users")
-    .select("id")
-    .eq("chatbot_id", chatbotId)
-    .eq("messenger_user_id", messengerUserId)
-    .maybeSingle();
-  if (existing) return { isNew: false };
-  await supabase.from("messenger_users").insert({ chatbot_id: chatbotId, messenger_user_id: messengerUserId });
+    .insert({ chatbot_id: chatbotId, messenger_user_id: messengerUserId });
+  if (error) {
+    // 23505 = unique_violation → user already exists
+    if ((error as any).code === "23505") return { isNew: false };
+    console.error("getOrCreateMessengerUser insert failed:", error);
+    return { isNew: false };
+  }
   return { isNew: true };
 }
 
@@ -368,8 +371,17 @@ Deno.serve(async (req) => {
         // Track new vs existing user, send welcome on first contact
         const { isNew } = await getOrCreateMessengerUser(supabase, chatbot.id, senderId);
         if (isNew) {
-          const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
-          await sendMessengerText(pageAccessToken, senderId, welcomeMsg);
+          // Safety double-check: never welcome a user who already has message history.
+          const { data: priorMsgs } = await supabase
+            .from("messenger_messages")
+            .select("id")
+            .eq("chatbot_id", chatbot.id)
+            .eq("messenger_user_id", senderId)
+            .limit(1);
+          if (!priorMsgs || priorMsgs.length === 0) {
+            const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
+            await sendMessengerText(pageAccessToken, senderId, welcomeMsg);
+          }
         }
 
         // Conversation history
