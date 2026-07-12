@@ -270,6 +270,32 @@ Deno.serve(async (req) => {
           const userMessage = message.text.body;
           const senderName = contactNames[senderPhone];
 
+          // Serialize concurrent messages from the same phone+chatbot.
+          let lockAcquired = false;
+          const releaseLock = async () => {
+            if (!lockAcquired) return;
+            lockAcquired = false;
+            try {
+              await supabase.rpc("release_conversation_lock", {
+                p_chatbot_id: chatbot.id,
+                p_external_id: senderPhone,
+              });
+            } catch (e) {
+              console.error("release_conversation_lock failed:", e);
+            }
+          };
+          try {
+            const { data: gotLock } = await supabase.rpc("acquire_conversation_lock", {
+              p_chatbot_id: chatbot.id,
+              p_external_id: senderPhone,
+            });
+            lockAcquired = gotLock !== false;
+          } catch (e) {
+            console.error("acquire_conversation_lock failed:", e);
+          }
+
+          try {
+
           // Upsert contact (save/update name and last message time)
           await upsertContact(supabase, chatbot.id, senderPhone, senderName);
 
@@ -364,6 +390,42 @@ Deno.serve(async (req) => {
             }
           }
 
+          // WhatsApp Cloud API: mark as read with a typing indicator for a human feel.
+          // Falls back silently if the API version doesn't support typing_indicator.
+          const waApiUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
+          try {
+            const r = await fetch(waApiUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                messaging_product: "whatsapp",
+                status: "read",
+                message_id: message.id,
+                typing_indicator: { type: "text" },
+              }),
+            });
+            if (!r.ok) {
+              // Retry without typing_indicator (older API versions)
+              await fetch(waApiUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                  messaging_product: "whatsapp",
+                  status: "read",
+                  message_id: message.id,
+                }),
+              }).catch(() => {});
+            }
+          } catch (e) {
+            console.error("WhatsApp typing/read indicator failed:", e);
+          }
+
           // Generate AI response with history and sender name
           const responseText = await generateAIResponse(
             userMessage,
@@ -383,7 +445,6 @@ Deno.serve(async (req) => {
           let m: RegExpExecArray | null;
           while ((m = imageRegex.exec(responseText)) !== null) imageUrls.push(m[1]);
           const cleanedText = responseText.replace(imageRegex, "").trim();
-          const waApiUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
 
           for (const imgUrl of imageUrls) {
             const r = await fetch(waApiUrl, {
@@ -417,6 +478,9 @@ Deno.serve(async (req) => {
               }),
             });
             if (!r.ok) console.error("WhatsApp text send error:", await r.text());
+          }
+          } finally {
+            await releaseLock();
           }
         }
       }

@@ -177,6 +177,20 @@ async function sendMessengerImage(pageAccessToken: string, recipientId: string, 
   if (!r.ok) console.error("Messenger sendImage error:", await r.text());
 }
 
+async function sendMessengerTypingOn(pageAccessToken: string, recipientId: string) {
+  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient: { id: recipientId }, sender_action: "typing_on" }),
+    });
+    if (!r.ok) console.error("Messenger typing_on error:", await r.text());
+  } catch (e) {
+    console.error("Messenger typing_on failed:", e);
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -313,6 +327,32 @@ Deno.serve(async (req) => {
 
         const senderId = messaging.sender.id;
         const userMessage = messaging.message.text;
+
+        // Serialize concurrent messages from the same sender+chatbot.
+        let lockAcquired = false;
+        const releaseLock = async () => {
+          if (!lockAcquired) return;
+          lockAcquired = false;
+          try {
+            await supabase.rpc("release_conversation_lock", {
+              p_chatbot_id: chatbot.id,
+              p_external_id: senderId,
+            });
+          } catch (e) {
+            console.error("release_conversation_lock failed:", e);
+          }
+        };
+        try {
+          const { data: gotLock } = await supabase.rpc("acquire_conversation_lock", {
+            p_chatbot_id: chatbot.id,
+            p_external_id: senderId,
+          });
+          lockAcquired = gotLock !== false;
+        } catch (e) {
+          console.error("acquire_conversation_lock failed:", e);
+        }
+
+        try {
 
         // Record customer profile
         await supabase.rpc("record_customer_contact", {
@@ -482,6 +522,8 @@ Deno.serve(async (req) => {
         }
 
         // Generate AI response
+        // Typing indicator for a more human feel.
+        await sendMessengerTypingOn(pageAccessToken, senderId);
         let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory, supabase);
 
         // Failed-responses handover
@@ -517,6 +559,9 @@ Deno.serve(async (req) => {
         }
         if (cleanedText) {
           await sendMessengerText(pageAccessToken, senderId, cleanedText);
+        }
+        } finally {
+          await releaseLock();
         }
       }
     }
