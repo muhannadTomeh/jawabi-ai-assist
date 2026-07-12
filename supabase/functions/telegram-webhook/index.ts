@@ -132,22 +132,19 @@ async function getOrCreateUser(
   firstName: string,
   username?: string
 ): Promise<{ isNew: boolean }> {
-  const { data: existing } = await supabase
-    .from("telegram_users")
-    .select("id")
-    .eq("telegram_user_id", telegramUserId)
-    .eq("chatbot_id", chatbotId)
-    .maybeSingle();
-
-  if (existing) return { isNew: false };
-
-  await supabase.from("telegram_users").insert({
+  // Atomic insert: rely on the UNIQUE(telegram_user_id, chatbot_id) constraint
+  // to distinguish new vs. returning users, avoiding a select-then-insert race.
+  const { error } = await supabase.from("telegram_users").insert({
     telegram_user_id: telegramUserId,
     chatbot_id: chatbotId,
     first_name: firstName,
     username: username || null,
   });
-
+  if (error) {
+    if ((error as any).code === "23505") return { isNew: false };
+    console.error("getOrCreateUser insert failed:", error);
+    return { isNew: false };
+  }
   return { isNew: true };
 }
 
@@ -403,12 +400,21 @@ Deno.serve(async (req) => {
 
     // For new users (first message without /start), send welcome THEN process
     if (isNew) {
-      const welcomeMsg = chatbot.welcome_message || `مرحباً ${firstName}! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
-      await fetch(telegramApiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: welcomeMsg }),
-      });
+      // Safety double-check: never welcome a user who already has message history.
+      const { data: priorMsgs } = await supabase
+        .from("telegram_messages")
+        .select("id")
+        .eq("chatbot_id", chatbot.id)
+        .eq("telegram_user_id", telegramUserId)
+        .limit(1);
+      if (!priorMsgs || priorMsgs.length === 0) {
+        const welcomeMsg = chatbot.welcome_message || `مرحباً ${firstName}! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
+        await fetch(telegramApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: welcomeMsg }),
+        });
+      }
     }
 
     // Get conversation history
