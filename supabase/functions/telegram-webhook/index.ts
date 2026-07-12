@@ -455,6 +455,7 @@ Deno.serve(async (req) => {
             content: userMessage,
           });
           console.log("Skipping bot: conversation under human takeover", telegramUserId);
+          await releaseLock();
           return new Response(JSON.stringify({ ok: true, takeover: true }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -499,6 +500,7 @@ Deno.serve(async (req) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: chatId, text: handoverMsg }),
         });
+        await releaseLock();
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
