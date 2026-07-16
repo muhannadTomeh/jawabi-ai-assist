@@ -296,7 +296,47 @@ async function handleConnectInstagram(body: any): Promise<Response> {
   }
 
   const supabase = getSupabase();
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const appId = getEnv("FACEBOOK_APP_ID");
+  const appSecret = getEnv("FACEBOOK_APP_SECRET");
   const tokenExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+  const verifyToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const webhookUrl = `${supabaseUrl}/functions/v1/messenger-webhook`;
+
+  // Subscribe the linked Facebook Page to Instagram messaging webhooks.
+  if (page_id) {
+    try {
+      const subUrl =
+        `https://graph.facebook.com/${FACEBOOK_API_VERSION}/${page_id}/subscribed_apps` +
+        `?access_token=${page_access_token}` +
+        `&subscribed_fields=messages,messaging_postbacks,instagram_manage_messages`;
+      const subRes = await fetch(subUrl, { method: "POST" });
+      const subData = await subRes.json();
+      if (subData.error) console.error("IG page subscribe error:", subData.error);
+    } catch (e) {
+      console.error("IG page subscribe failed:", e);
+    }
+  }
+
+  // App-level webhook subscription for object=instagram.
+  try {
+    const appAccessToken = `${appId}|${appSecret}`;
+    const res = await fetch(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${appId}/subscriptions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        object: "instagram",
+        callback_url: webhookUrl,
+        verify_token: verifyToken,
+        fields: "messages,messaging_postbacks",
+        access_token: appAccessToken,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) console.error("IG app subscribe error:", data.error);
+  } catch (e) {
+    console.error("IG app subscribe failed:", e);
+  }
 
   const { error } = await supabase
     .from("social_connections")
@@ -308,7 +348,13 @@ async function handleConnectInstagram(body: any): Promise<Response> {
       page_name: ig_name || ig_username || "",
       access_token: page_access_token,
       token_expiry: tokenExpiry,
-      metadata: { ig_username, linked_page_id: page_id, linked_page_name: page_name },
+      metadata: {
+        ig_username,
+        linked_page_id: page_id,
+        linked_page_name: page_name,
+        verify_token: verifyToken,
+        webhook_url: webhookUrl,
+      },
     }, { onConflict: "chatbot_id,platform,page_id" });
 
   if (error) {
@@ -316,7 +362,7 @@ async function handleConnectInstagram(body: any): Promise<Response> {
     return jsonResponse({ error: "فشل في حفظ البيانات" }, 500);
   }
 
-  return jsonResponse({ success: true, page_name: ig_name || ig_username || "" });
+  return jsonResponse({ success: true, page_name: ig_name || ig_username || "", verify_token: verifyToken, webhook_url: webhookUrl });
 }
 
 // Connect WhatsApp Business
