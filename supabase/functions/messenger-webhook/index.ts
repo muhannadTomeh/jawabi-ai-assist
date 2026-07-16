@@ -157,8 +157,8 @@ async function saveMessengerMessages(
   }
 }
 
-async function sendMessengerText(pageAccessToken: string, recipientId: string, text: string) {
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+async function sendMessengerText(sendBase: string, pageAccessToken: string, recipientId: string, text: string) {
+  const url = `${sendBase}?access_token=${pageAccessToken}`;
   const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -167,8 +167,8 @@ async function sendMessengerText(pageAccessToken: string, recipientId: string, t
   if (!r.ok) console.error("Messenger sendText error:", await r.text());
 }
 
-async function sendMessengerImage(pageAccessToken: string, recipientId: string, imageUrl: string) {
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+async function sendMessengerImage(sendBase: string, pageAccessToken: string, recipientId: string, imageUrl: string) {
+  const url = `${sendBase}?access_token=${pageAccessToken}`;
   const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -180,8 +180,8 @@ async function sendMessengerImage(pageAccessToken: string, recipientId: string, 
   if (!r.ok) console.error("Messenger sendImage error:", await r.text());
 }
 
-async function sendMessengerTypingOn(pageAccessToken: string, recipientId: string) {
-  const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+async function sendMessengerTypingOn(sendBase: string, pageAccessToken: string, recipientId: string) {
+  const url = `${sendBase}?access_token=${pageAccessToken}`;
   try {
     const r = await fetch(url, {
       method: "POST",
