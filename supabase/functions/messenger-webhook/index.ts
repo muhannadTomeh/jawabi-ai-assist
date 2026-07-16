@@ -213,11 +213,11 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token && challenge) {
-      // Check social_connections metadata for verify_token
+      // Check social_connections metadata for verify_token (facebook OR instagram)
       const { data: socialConns } = await supabase
         .from("social_connections")
-        .select("id, metadata")
-        .eq("platform", "facebook");
+        .select("id, metadata, platform")
+        .in("platform", ["facebook", "instagram"]);
 
       const socialConn = socialConns?.find(
         (c: any) => c.metadata?.verify_token === token
@@ -253,11 +253,14 @@ Deno.serve(async (req) => {
     const body: MessengerWebhook = await req.json();
     console.log("Received Messenger webhook:", JSON.stringify(body));
 
-    if (body.object !== "page") {
+    if (body.object !== "page" && body.object !== "instagram") {
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const isInstagram = body.object === "instagram";
+    const channelName = isInstagram ? "instagram" : "facebook";
 
     for (const entry of body.entry) {
       const pageId = entry.id;
@@ -265,18 +268,26 @@ Deno.serve(async (req) => {
       // Try social_connections first, fall back to channels
       let chatbot: any = null;
       let pageAccessToken: string | null = null;
+      let sendBase = "https://graph.facebook.com/v18.0/me/messages";
 
       const { data: socialConn } = await supabase
         .from("social_connections")
         .select("*, chatbots(*)")
-        .eq("platform", "facebook")
+        .eq("platform", isInstagram ? "instagram" : "facebook")
         .eq("page_id", pageId)
         .maybeSingle();
 
       if (socialConn) {
         chatbot = socialConn.chatbots;
         pageAccessToken = socialConn.access_token;
+        if (isInstagram) {
+          sendBase = `https://graph.facebook.com/v21.0/${pageId}/messages`;
+        }
       } else {
+        if (isInstagram) {
+          console.log("No Instagram connection found for ig_id:", pageId);
+          continue;
+        }
         // Fallback to legacy channels table (filter JSONB in JS)
         const { data: legacyChannels } = await supabase
           .from("channels")
@@ -315,7 +326,7 @@ Deno.serve(async (req) => {
             await supabase.from("conversation_takeovers").upsert(
               {
                 chatbot_id: chatbot.id,
-                channel: "facebook",
+                channel: channelName,
                 external_id: recipientId,
                 active: true,
                 last_human_at: new Date().toISOString(),
@@ -360,7 +371,7 @@ Deno.serve(async (req) => {
         // Record customer profile
         await supabase.rpc("record_customer_contact", {
           _chatbot_id: chatbot.id,
-          _channel: "facebook",
+          _channel: channelName,
           _external_id: senderId,
           _name: null,
           _username: null,
@@ -380,7 +391,7 @@ Deno.serve(async (req) => {
             .limit(1);
           if (!priorMsgs || priorMsgs.length === 0) {
             const welcomeMsg = chatbot.welcome_message || `مرحباً! أنا ${chatbot.name}. كيف يمكنني مساعدتك؟`;
-            await sendMessengerText(pageAccessToken, senderId, welcomeMsg);
+            await sendMessengerText(sendBase, pageAccessToken, senderId, welcomeMsg);
           }
         }
 
@@ -400,7 +411,7 @@ Deno.serve(async (req) => {
             .from("conversation_takeovers")
             .select("active,last_human_at")
             .eq("chatbot_id", chatbot.id)
-            .eq("channel", "facebook")
+            .eq("channel", channelName)
             .eq("external_id", senderId)
             .maybeSingle();
           if (takeover?.active) {
@@ -420,7 +431,7 @@ Deno.serve(async (req) => {
                 .from("conversation_takeovers")
                 .update({ active: false })
                 .eq("chatbot_id", chatbot.id)
-                .eq("channel", "facebook")
+                .eq("channel", channelName)
                 .eq("external_id", senderId);
             }
           }
@@ -431,7 +442,7 @@ Deno.serve(async (req) => {
             chatbot_id: chatbot.id,
             type,
             title,
-            channel: "facebook",
+            channel: channelName,
             contact_identifier: senderId,
             contact_name: null,
             last_message: userMessage,
@@ -448,7 +459,7 @@ Deno.serve(async (req) => {
             const handoverMsg = handover.handover_message || "سأقوم بتحويلك إلى أحد أعضاء فريقنا للمساعدة.";
             await saveMessengerMessages(supabase, chatbot.id, senderId, userMessage, handoverMsg);
             await createNotification("human_request", "طلب التحدث مع موظف");
-            await sendMessengerText(pageAccessToken, senderId, handoverMsg);
+            await sendMessengerText(sendBase, pageAccessToken, senderId, handoverMsg);
             continue;
           }
         }
@@ -478,7 +489,7 @@ Deno.serve(async (req) => {
                 if (handover.trigger_on_sale === true) {
                   await createNotification("sale", "طلب شراء");
                 }
-                await sendMessengerText(pageAccessToken, senderId, saleMsg);
+                await sendMessengerText(sendBase, pageAccessToken, senderId, saleMsg);
                 continue;
               }
             }
@@ -535,7 +546,7 @@ Deno.serve(async (req) => {
 
         // Generate AI response
         // Typing indicator for a more human feel.
-        await sendMessengerTypingOn(pageAccessToken, senderId);
+        await sendMessengerTypingOn(sendBase, pageAccessToken, senderId);
         let responseText = await generateAIResponse(userMessage, knowledgeContext, chatbot, conversationHistory, supabase);
 
         // Failed-responses handover
@@ -567,10 +578,10 @@ Deno.serve(async (req) => {
         const cleanedText = responseText.replace(imageRegex, "").trim();
 
         for (const imgUrl of imageUrls) {
-          await sendMessengerImage(pageAccessToken, senderId, imgUrl);
+          await sendMessengerImage(sendBase, pageAccessToken, senderId, imgUrl);
         }
         if (cleanedText) {
-          await sendMessengerText(pageAccessToken, senderId, cleanedText);
+          await sendMessengerText(sendBase, pageAccessToken, senderId, cleanedText);
         }
         } finally {
           await releaseLock();
