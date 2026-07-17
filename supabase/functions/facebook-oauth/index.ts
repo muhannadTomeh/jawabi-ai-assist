@@ -118,7 +118,9 @@ async function handleGetInstagramAccounts(body: any): Promise<Response> {
     const pagesData = await pagesRes.json();
 
     if (pagesData.error || !pagesData.data) {
-      return jsonResponse({ error: "فشل في جلب حسابات انستغرام" }, 400);
+      console.error("IG pages fetch error:", pagesData.error);
+      const detail = pagesData.error?.message || pagesData.error?.error_user_msg || "";
+      return jsonResponse({ error: `فشل في جلب حسابات انستغرام${detail ? ": " + detail : ""}`, graph_error: pagesData.error || null }, 400);
     }
 
     const accounts = pagesData.data
@@ -134,7 +136,10 @@ async function handleGetInstagramAccounts(body: any): Promise<Response> {
       }));
 
     if (accounts.length === 0) {
-      return jsonResponse({ error: "لا توجد حسابات انستغرام بزنس مرتبطة بصفحاتك" }, 400);
+      return jsonResponse({
+        error: "لا توجد حسابات انستغرام بزنس مرتبطة بصفحاتك. تأكد أن حساب انستغرام من نوع Business ومرتبط بصفحة فيسبوك، وأنك منحت الصلاحيات المطلوبة (instagram_basic, instagram_manage_messages, pages_show_list).",
+        pages_returned: pagesData.data?.length || 0,
+      }, 400);
     }
 
     return jsonResponse({ accounts, long_lived_token: longLivedToken });
