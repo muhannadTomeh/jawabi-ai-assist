@@ -13,6 +13,31 @@ import { Loader2, CheckCircle, Facebook, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// supabase.functions.invoke throws FunctionsHttpError with a Response in `context`
+// on non-2xx. The default `error.message` is a generic "Edge Function returned a
+// non-2xx status code" — the real reason is only in the response body.
+async function extractInvokeError(error: any, data: any): Promise<string | null> {
+  if (data?.error) return String(data.error);
+  if (!error) return null;
+  try {
+    const ctx = error?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      const cloned = typeof ctx.clone === 'function' ? ctx.clone() : ctx;
+      const body = await cloned.json();
+      if (body?.error) return String(body.error);
+      return JSON.stringify(body);
+    }
+    if (ctx && typeof ctx.text === 'function') {
+      const cloned = typeof ctx.clone === 'function' ? ctx.clone() : ctx;
+      const txt = await cloned.text();
+      if (txt) return txt;
+    }
+  } catch {
+    /* fall through */
+  }
+  return error?.message || null;
+}
+
 declare global {
   interface Window {
     FB: any;
@@ -152,9 +177,11 @@ export function OAuthConnectDialog({
           .invoke('facebook-oauth', {
             body: { action: actionMap[platform], user_access_token: userAccessToken },
           })
-          .then(({ data, error }) => {
+          .then(async ({ data, error }) => {
             if (error || data?.error) {
-              toast.error(data?.error || error?.message || 'فشل في جلب البيانات');
+              const msg = await extractInvokeError(error, data);
+              console.error('facebook-oauth invoke failed:', { action: actionMap[platform], error, data, resolved: msg });
+              toast.error(msg || 'فشل في جلب البيانات');
               return;
             }
 
@@ -216,7 +243,11 @@ export function OAuthConnectDialog({
         body: connectBody,
       });
 
-      if (error || data?.error) throw new Error(data?.error || error?.message || 'فشل في الربط');
+      if (error || data?.error) {
+        const msg = await extractInvokeError(error, data);
+        console.error('facebook-oauth connect failed:', { action: connectBody.action, error, data, resolved: msg });
+        throw new Error(msg || 'فشل في الربط');
+      }
 
       if (platform === 'whatsapp' && data.webhook_url && data.verify_token) {
         setWebhookInfo({ url: data.webhook_url, token: data.verify_token });
